@@ -6,10 +6,13 @@ import { RM, num } from '../lib/format'
 import { lineNet, quoteTotals } from '../lib/pricing'
 import { STATUSES } from '../lib/status'
 import { categoryOf, sortCategories } from '../lib/categories'
-import { longestLead, leadText } from '../lib/quoteDoc'
+import { longestLead, leadText, itemLabel } from '../lib/quoteDoc'
+import { reasonLabel, competitorLabel } from '../lib/outcome'
 import { generateQuotePDF } from '../lib/pdf'
 import SpecModal from '../components/SpecModal'
 import QuoteReview from '../components/QuoteReview'
+import OutcomeModal from '../components/OutcomeModal'
+import TermsTemplateModal from '../components/TermsTemplateModal'
 
 function newQuoteNo() {
   const d = new Date()
@@ -36,40 +39,42 @@ export default function QuotationEditor() {
     quote_date: todayISO(),
     valid_until: plusDays(30),
     status: 'draft',
-    quote_discount_pct: 0,
     tax_pct: 0,
     notes: '',
     terms: '',
+    outcome_reason: '', outcome_reason_note: '', competitor: '', competitor_note: '',
   })
 
-  // filters
   const [f, setF] = useState({ q: '', cat: '', type: '', air: '' })
   const [specProduct, setSpecProduct] = useState(null)
   const [showReview, setShowReview] = useState(false)
+  const [showOutcome, setShowOutcome] = useState(null) // 'won' | 'lost' | null
+  const [showTemplates, setShowTemplates] = useState(false)
 
   useEffect(() => {
     supabase.from('products').select('*').order('series').then(({ data }) => setProducts(data || []))
     supabase.from('customers').select('*').order('company').then(({ data }) => setCustomers(data || []))
   }, [])
 
-  // default terms from profile (only for a brand-new quote)
   useEffect(() => {
     if (!id && profile?.default_terms) setHead((h) => (h.terms ? h : { ...h, terms: profile.default_terms }))
   }, [profile, id])
 
-  // load existing quote
   useEffect(() => {
     if (!id) return
     ;(async () => {
       const { data: q } = await supabase.from('quotations').select('*').eq('id', id).single()
       if (q) setHead({
         quote_no: q.quote_no, customer_id: q.customer_id || '', quote_date: q.quote_date,
-        valid_until: q.valid_until, status: q.status, quote_discount_pct: q.quote_discount_pct || 0,
-        tax_pct: q.tax_pct || 0, notes: q.notes || '', terms: q.terms || '',
+        valid_until: q.valid_until, status: q.status, tax_pct: q.tax_pct || 0,
+        notes: q.notes || '', terms: q.terms || '',
+        outcome_reason: q.outcome_reason || '', outcome_reason_note: q.outcome_reason_note || '',
+        competitor: q.competitor || '', competitor_note: q.competitor_note || '',
       })
       const { data: its } = await supabase.from('quotation_items').select('*').eq('quotation_id', id).order('position')
       setItems((its || []).map((it) => ({
         product_id: it.product_id, model: it.model, description: it.description,
+        is_custom: it.is_custom || false, title: it.title || '',
         unit_price: Number(it.unit_price), unit_cost: Number(it.unit_cost) || 0, qty: Number(it.qty),
         adjust_type: it.adjust_type || 'discount', adjust_pct: Number(it.adjust_pct) || 0,
       })))
@@ -93,37 +98,58 @@ export default function QuotationEditor() {
       const i = prev.findIndex((it) => it.product_id === p.id)
       if (i >= 0) { const c = [...prev]; c[i] = { ...c[i], qty: c[i].qty + 1 }; return c }
       return [...prev, {
-        product_id: p.id, model: p.model, description: p.type,
+        product_id: p.id, model: p.model, description: p.type, is_custom: false, title: '',
         unit_price: Number(p.price_rm) || 0, unit_cost: Number(p.cost_rm) || 0,
         qty: 1, adjust_type: 'discount', adjust_pct: 0,
       }]
     })
   }
+  function addCustom() {
+    setItems((prev) => [...prev, {
+      product_id: null, model: null, is_custom: true, title: '', description: '',
+      unit_price: 0, unit_cost: 0, qty: 1, adjust_type: 'discount', adjust_pct: 0,
+    }])
+  }
   const updateItem = (i, patch) => setItems((p) => p.map((it, idx) => (idx === i ? { ...it, ...patch } : it)))
   const removeItem = (i) => setItems((p) => p.filter((_, idx) => idx !== i))
 
-  const totals = useMemo(() => quoteTotals(items, head.quote_discount_pct, head.tax_pct), [items, head])
+  // Equipment first, then custom lines (everywhere: editor, totals, PDF). Keep original index for edits.
+  const ordered = useMemo(
+    () => items.map((it, idx) => ({ it, idx })).sort((a, b) => (a.it.is_custom ? 1 : 0) - (b.it.is_custom ? 1 : 0)),
+    [items],
+  )
+
+  const totals = useMemo(() => quoteTotals(items, 0, head.tax_pct), [items, head.tax_pct])
   const customer = customers.find((c) => c.id === head.customer_id)
 
-  // Enrich each line with its full product record (specs + lead time) for the PDF / review.
   const productById = useMemo(() => Object.fromEntries(products.map((p) => [p.id, p])), [products])
   const docItems = useMemo(
-    () => items.map((it) => {
-      const product = productById[it.product_id] || null
+    () => ordered.map(({ it }) => {
+      const product = it.is_custom ? null : productById[it.product_id] || null
       return { ...it, product, lead_time_weeks: product?.lead_time_weeks }
     }),
-    [items, productById],
+    [ordered, productById],
   )
   const lead = useMemo(() => longestLead(docItems), [docItems])
 
+  function changeStatus(s) {
+    setHead((h) => ({ ...h, status: s }))
+    if (s === 'won' || s === 'lost') setShowOutcome(s)
+  }
+
   async function save() {
-    if (items.length === 0) return alert('Add at least one product.')
+    if (items.length === 0) return alert('Add at least one item.')
     setBusy(true)
+    const isOutcome = head.status === 'won' || head.status === 'lost'
     const payload = {
       quote_no: head.quote_no, customer_id: head.customer_id || null, salesperson_id: user.id,
       quote_date: head.quote_date, valid_until: head.valid_until, status: head.status,
-      quote_discount_pct: Number(head.quote_discount_pct) || 0, tax_pct: Number(head.tax_pct) || 0,
-      subtotal: totals.subtotal, total: totals.total, notes: head.notes, terms: head.terms,
+      tax_pct: Number(head.tax_pct) || 0, subtotal: totals.subtotal, total: totals.total,
+      notes: head.notes, terms: head.terms,
+      outcome_reason: isOutcome ? head.outcome_reason || null : null,
+      outcome_reason_note: isOutcome ? head.outcome_reason_note || null : null,
+      competitor: isOutcome ? head.competitor || null : null,
+      competitor_note: isOutcome ? head.competitor_note || null : null,
     }
     let quoteId = id
     if (id) {
@@ -135,8 +161,9 @@ export default function QuotationEditor() {
       quoteId = data.id
     }
     await supabase.from('quotation_items').delete().eq('quotation_id', quoteId)
-    const rows = items.map((it, idx) => ({
-      quotation_id: quoteId, product_id: it.product_id, model: it.model, description: it.description,
+    const rows = ordered.map(({ it }, idx) => ({
+      quotation_id: quoteId, product_id: it.product_id, model: it.model,
+      is_custom: !!it.is_custom, title: it.title || null, description: it.description,
       unit_price: it.unit_price, unit_cost: Number(it.unit_cost) || 0, qty: it.qty,
       adjust_type: it.adjust_type, adjust_pct: Number(it.adjust_pct) || 0,
       line_total: lineNet(it), position: idx,
@@ -148,9 +175,7 @@ export default function QuotationEditor() {
     alert('Quote saved.')
   }
 
-  function downloadPDF() {
-    generateQuotePDF({ quote: head, items: docItems, customer, profile })
-  }
+  const downloadPDF = () => generateQuotePDF({ quote: head, items: docItems, customer, profile })
 
   return (
     <div className="grid lg:grid-cols-[1fr_380px] gap-6">
@@ -181,36 +206,50 @@ export default function QuotationEditor() {
         </div>
 
         <div className="card p-4">
-          <h2 className="font-semibold mb-3">Line items</h2>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-semibold">Line items</h2>
+            <button onClick={addCustom} className="btn-ghost py-1 px-2 text-xs">+ Add custom line / service</button>
+          </div>
           {items.length === 0 ? (
-            <p className="text-sm text-slate-400">Click products above to add them.</p>
+            <p className="text-sm text-slate-400">Click products above, or add a custom line (e.g. M&amp;E / civil works).</p>
           ) : (
-            <div className="space-y-2">
-              <div className="grid grid-cols-12 gap-2 text-[11px] font-semibold text-slate-500 px-1">
-                <div className="col-span-4">Item</div><div className="col-span-1">Qty</div>
-                <div className="col-span-2">Unit (RM)</div><div className="col-span-3">Adjustment</div>
-                <div className="col-span-2 text-right">Amount</div>
-              </div>
-              {items.map((it, i) => (
-                <div key={i} className="grid grid-cols-12 gap-2 items-center">
-                  <div className="col-span-4">
-                    <input className="input py-1 text-sm" value={it.description} onChange={(e) => updateItem(i, { description: e.target.value })} />
-                    <div className="text-[11px] text-slate-400 mt-0.5">{it.model}</div>
+            <div className="space-y-3">
+              {ordered.map(({ it, idx }) => (
+                it.is_custom ? (
+                  <div key={idx} className="border border-amber-200 bg-amber-50/40 rounded-md p-2 space-y-2">
+                    <div className="grid grid-cols-12 gap-2 items-center">
+                      <input className="input py-1 col-span-5 text-sm" placeholder="Title (shown on quote line, e.g. M&E Works)" value={it.title} onChange={(e) => updateItem(idx, { title: e.target.value })} />
+                      <input type="number" min="1" className="input py-1 col-span-2" value={it.qty} onChange={(e) => updateItem(idx, { qty: Number(e.target.value) })} />
+                      <input type="number" className="input py-1 col-span-3" placeholder="Unit RM" value={it.unit_price} onChange={(e) => updateItem(idx, { unit_price: Number(e.target.value) })} />
+                      <div className="col-span-2 text-right text-sm font-medium flex items-center justify-end gap-2">
+                        {RM(lineNet(it))}
+                        <button onClick={() => removeItem(idx)} className="text-red-500 hover:text-red-700">✕</button>
+                      </div>
+                    </div>
+                    <textarea className="input py-1 text-sm" rows={2} placeholder="Full description — shown on its own page at the back of the quote" value={it.description || ''} onChange={(e) => updateItem(idx, { description: e.target.value })} />
+                    <div className="text-[11px] text-amber-700">Custom line · prints after equipment, with a description page</div>
                   </div>
-                  <input type="number" min="1" className="input py-1 col-span-1" value={it.qty} onChange={(e) => updateItem(i, { qty: Number(e.target.value) })} />
-                  <input type="number" className="input py-1 col-span-2" value={it.unit_price} onChange={(e) => updateItem(i, { unit_price: Number(e.target.value) })} />
-                  <div className="col-span-3 flex gap-1">
-                    <select className="input py-1 w-24" value={it.adjust_type} onChange={(e) => updateItem(i, { adjust_type: e.target.value })}>
-                      <option value="discount">Disc %</option>
-                      <option value="markup">Markup %</option>
-                    </select>
-                    <input type="number" className="input py-1" value={it.adjust_pct} onChange={(e) => updateItem(i, { adjust_pct: Number(e.target.value) })} />
+                ) : (
+                  <div key={idx} className="grid grid-cols-12 gap-2 items-center">
+                    <div className="col-span-4">
+                      <input className="input py-1 text-sm" value={it.description} onChange={(e) => updateItem(idx, { description: e.target.value })} />
+                      <div className="text-[11px] text-slate-400 mt-0.5">{it.model}</div>
+                    </div>
+                    <input type="number" min="1" className="input py-1 col-span-1" value={it.qty} onChange={(e) => updateItem(idx, { qty: Number(e.target.value) })} />
+                    <input type="number" className="input py-1 col-span-2" value={it.unit_price} onChange={(e) => updateItem(idx, { unit_price: Number(e.target.value) })} />
+                    <div className="col-span-3 flex gap-1">
+                      <select className="input py-1 w-24" value={it.adjust_type} onChange={(e) => updateItem(idx, { adjust_type: e.target.value })}>
+                        <option value="discount">Disc %</option>
+                        <option value="markup">Markup %</option>
+                      </select>
+                      <input type="number" className="input py-1" value={it.adjust_pct} onChange={(e) => updateItem(idx, { adjust_pct: Number(e.target.value) })} />
+                    </div>
+                    <div className="col-span-2 text-right text-sm font-medium flex items-center justify-end gap-2">
+                      {RM(lineNet(it))}
+                      <button onClick={() => removeItem(idx)} className="text-red-500 hover:text-red-700">✕</button>
+                    </div>
                   </div>
-                  <div className="col-span-2 text-right text-sm font-medium flex items-center justify-end gap-2">
-                    {RM(lineNet(it))}
-                    <button onClick={() => removeItem(i)} className="text-red-500 hover:text-red-700">✕</button>
-                  </div>
-                </div>
+                )
               ))}
             </div>
           )}
@@ -236,31 +275,35 @@ export default function QuotationEditor() {
             <Labeled label="Date"><input type="date" className="input" value={head.quote_date} onChange={(e) => setHead({ ...head, quote_date: e.target.value })} /></Labeled>
             <Labeled label="Valid until"><input type="date" className="input" value={head.valid_until} onChange={(e) => setHead({ ...head, valid_until: e.target.value })} /></Labeled>
             <Labeled label="Status">
-              <select className="input" value={head.status} onChange={(e) => setHead({ ...head, status: e.target.value })}>
+              <select className="input" value={head.status} onChange={(e) => changeStatus(e.target.value)}>
                 {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
               </select>
             </Labeled>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <Labeled label="Quote discount %"><input type="number" className="input" value={head.quote_discount_pct} onChange={(e) => setHead({ ...head, quote_discount_pct: Number(e.target.value) })} /></Labeled>
             <Labeled label="Tax / SST %"><input type="number" className="input" value={head.tax_pct} onChange={(e) => setHead({ ...head, tax_pct: Number(e.target.value) })} /></Labeled>
           </div>
-          <Labeled label="Terms & conditions"><textarea className="input" rows={3} value={head.terms} onChange={(e) => setHead({ ...head, terms: e.target.value })} /></Labeled>
+          {(head.status === 'won' || head.status === 'lost') && (
+            <div className="text-xs bg-slate-50 border rounded px-2 py-1.5 flex items-center justify-between">
+              <span className="text-slate-600">
+                {head.status === 'won' ? 'Won' : 'Lost'} · {reasonLabel(head)} · vs {competitorLabel(head)}
+              </span>
+              <button className="text-brand hover:underline" onClick={() => setShowOutcome(head.status)}>edit</button>
+            </div>
+          )}
+          <div>
+            <div className="flex items-center justify-between">
+              <label className="label mb-0">Terms &amp; conditions</label>
+              <button className="text-slate-400 hover:text-brand text-sm" title="Templates" onClick={() => setShowTemplates(true)}>✎</button>
+            </div>
+            <textarea className="input mt-1" rows={3} value={head.terms} onChange={(e) => setHead({ ...head, terms: e.target.value })} />
+          </div>
         </div>
 
         <div className="card p-4 space-y-1.5 text-sm">
-          <Row label="List value" value={RM(totals.listValue)} muted />
-          <Row label="Subtotal (after line adj.)" value={RM(totals.subtotal)} />
-          {head.quote_discount_pct > 0 && <Row label={`Quote discount (${head.quote_discount_pct}%)`} value={`- ${RM(totals.quoteDiscount)}`} />}
+          <Row label="Subtotal" value={RM(totals.subtotal)} />
           {head.tax_pct > 0 && <Row label={`Tax (${head.tax_pct}%)`} value={RM(totals.tax)} />}
           <div className="border-t pt-2 mt-1 flex justify-between font-bold text-base">
             <span>Total</span><span className="text-brand">{RM(totals.total)}</span>
           </div>
-          {totals.listValue > totals.subtotal && (
-            <div className="text-[11px] text-amber-600 pt-1">
-              You're giving away {RM(totals.listValue - totals.subtotal)} ({((1 - totals.subtotal / totals.listValue) * 100).toFixed(1)}%) in line discounts.
-            </div>
-          )}
           {lead && (
             <div className="text-[11px] text-brand-dark bg-brand-light rounded px-2 py-1 mt-1">
               Lead time based on equipment <b>{lead.model}</b>: {leadText(lead.weeks)}
@@ -282,6 +325,19 @@ export default function QuotationEditor() {
           onClose={() => setShowReview(false)} onDownload={downloadPDF}
         />
       )}
+      {showOutcome && (
+        <OutcomeModal
+          mode={showOutcome} initial={head}
+          onSave={(fields) => { setHead((h) => ({ ...h, ...fields })); setShowOutcome(null) }}
+          onCancel={() => setShowOutcome(null)}
+        />
+      )}
+      {showTemplates && (
+        <TermsTemplateModal
+          onApply={(body) => setHead((h) => ({ ...h, terms: body }))}
+          onClose={() => setShowTemplates(false)}
+        />
+      )}
     </div>
   )
 }
@@ -297,6 +353,6 @@ function Select({ placeholder, options, ...props }) {
 function Labeled({ label, children }) {
   return <div><label className="label">{label}</label>{children}</div>
 }
-function Row({ label, value, muted }) {
-  return <div className={`flex justify-between ${muted ? 'text-slate-400' : ''}`}><span>{label}</span><span>{value}</span></div>
+function Row({ label, value }) {
+  return <div className="flex justify-between"><span>{label}</span><span>{value}</span></div>
 }

@@ -1,12 +1,17 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, Legend,
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend,
+  ComposedChart, Line,
 } from 'recharts'
 import { supabase } from '../lib/supabase'
-import { RM, num, pct, fmtDate, daysBetween } from '../lib/format'
+import { RM, num, pct, daysBetween } from '../lib/format'
 import { OPEN_STATUSES, STATUS_META } from '../lib/status'
-import { categoryOf } from '../lib/categories'
+import { reasonLabel, competitorLabel } from '../lib/outcome'
+
+const STATUS_COLORS = { draft: '#94a3b8', sent: '#f59e0b', won: '#16a34a', lost: '#ef4444', expired: '#a855f7' }
+const STACK = ['won', 'lost', 'sent', 'expired', 'draft']
+const monthFmt = (k) => k // 'YYYY-MM'
 
 export default function Dashboard() {
   const [quotes, setQuotes] = useState([])
@@ -17,7 +22,7 @@ export default function Dashboard() {
     ;(async () => {
       const [{ data: q }, { data: it }] = await Promise.all([
         supabase.from('quotations').select('*, customers(company)'),
-        supabase.from('quotation_items').select('unit_price, unit_cost, qty, line_total, quotation_id, products(series, category), quotations(status)'),
+        supabase.from('quotation_items').select('unit_cost, qty, quotation_id, quotations(status)'),
       ])
       setQuotes(q || [])
       setItems(it || [])
@@ -35,70 +40,53 @@ export default function Dashboard() {
     const winRate = decided ? (won.length / decided) * 100 : 0
     const avgDeal = won.length ? wonRevenue / won.length : 0
 
-    // funnel
-    const funnel = ['draft', 'sent', 'won', 'lost'].map((s) => ({
-      name: STATUS_META[s].label, value: quotes.filter((q) => q.status === s).length, key: s,
-    }))
-
-    // cost per quote (snapshotted unit_cost × qty)
+    // gross margin (cost snapshotted on won quotes)
     const costByQuote = {}
     items.forEach((it) => {
-      const id = it.quotation_id
-      costByQuote[id] = (costByQuote[id] || 0) + (Number(it.unit_cost) || 0) * (Number(it.qty) || 0)
+      costByQuote[it.quotation_id] = (costByQuote[it.quotation_id] || 0) + (Number(it.unit_cost) || 0) * (Number(it.qty) || 0)
     })
-
-    // revenue + cost by month (won)
-    const byMonth = {}
-    won.forEach((q) => {
-      const k = (q.quote_date || '').slice(0, 7)
-      if (!k) return
-      byMonth[k] = byMonth[k] || { revenue: 0, cost: 0 }
-      byMonth[k].revenue += Number(q.total || 0)
-      byMonth[k].cost += costByQuote[q.id] || 0
-    })
-    const revenueSeries = Object.entries(byMonth).sort().slice(-12)
-      .map(([k, v]) => ({ month: k, revenue: Math.round(v.revenue), cost: Math.round(v.cost) }))
-
-    // realized margin on won deals
     const wonCost = won.reduce((s, q) => s + (costByQuote[q.id] || 0), 0)
     const grossMargin = wonRevenue - wonCost
     const marginPct = wonRevenue ? (grossMargin / wonRevenue) * 100 : 0
     const hasCostData = wonCost > 0
 
-    // discount leakage (all quotes): gross vs net at line level
-    let gross = 0, net = 0
-    items.forEach((it) => {
-      gross += (Number(it.unit_price) || 0) * (Number(it.qty) || 0)
-      net += Number(it.line_total) || 0
+    // funnel: count (bars) + value (line)
+    const funnel = ['draft', 'sent', 'won', 'lost'].map((s) => {
+      const list = quotes.filter((q) => q.status === s)
+      return { stage: STATUS_META[s].label, count: list.length, value: Math.round(list.reduce((a, q) => a + Number(q.total || 0), 0)) }
     })
-    const leakage = gross - net
-    const leakagePct = gross ? (leakage / gross) * 100 : 0
 
-    // win rate by category (won vs decided, by line count)
-    const byCat = {}
-    items.forEach((it) => {
-      const s = it.products ? categoryOf(it.products) : null
-      const st = it.quotations?.status
-      if (!s || !['won', 'lost'].includes(st)) return
-      byCat[s] = byCat[s] || { won: 0, total: 0 }
-      byCat[s].total++
-      if (st === 'won') byCat[s].won++
+    // monthly stacked by status — counts and value
+    const mc = {}, mv = {}
+    quotes.forEach((q) => {
+      const k = (q.quote_date || '').slice(0, 7)
+      if (!k || STATUS_COLORS[q.status] === undefined) return
+      mc[k] = mc[k] || { month: k, draft: 0, sent: 0, won: 0, lost: 0, expired: 0 }
+      mv[k] = mv[k] || { month: k, draft: 0, sent: 0, won: 0, lost: 0, expired: 0 }
+      mc[k][q.status] += 1
+      mv[k][q.status] += Number(q.total || 0)
     })
-    const seriesWin = Object.entries(byCat).map(([s, v]) => ({
-      series: s, rate: v.total ? (v.won / v.total) * 100 : 0, total: v.total,
-    })).sort((a, b) => b.rate - a.rate)
+    const byMonthCount = Object.values(mc).sort((a, b) => a.month.localeCompare(b.month)).slice(-12)
+    const byMonthValue = Object.values(mv).sort((a, b) => a.month.localeCompare(b.month)).slice(-12)
+      .map((r) => ({ ...r, ...Object.fromEntries(STACK.map((s) => [s, Math.round(r[s])])) }))
 
-    // aging / action list: open quotes, oldest first; flag expiring
-    const aging = open.map((q) => ({
-      ...q,
-      age: daysBetween(q.quote_date),
-      expIn: q.valid_until ? daysBetween(new Date(), q.valid_until) : null,
-    })).sort((a, b) => b.age - a.age)
+    // win/loss breakdowns
+    const breakdown = (list, fn) => {
+      const map = {}
+      list.forEach((q) => { const k = fn(q) === '—' ? 'Unspecified' : fn(q); map[k] = (map[k] || 0) + 1 })
+      return Object.entries(map).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value)
+    }
+    const win = { reason: breakdown(won, reasonLabel), brand: breakdown(won, competitorLabel) }
+    const loss = { reason: breakdown(lost, reasonLabel), brand: breakdown(lost, competitorLabel) }
+
+    const aging = open.map((q) => ({ ...q, age: daysBetween(q.quote_date), expIn: q.valid_until ? daysBetween(new Date(), q.valid_until) : null }))
+      .sort((a, b) => b.age - a.age)
 
     const thisMonth = new Date().toISOString().slice(0, 7)
     const quotesThisMonth = quotes.filter((q) => (q.quote_date || '').startsWith(thisMonth)).length
 
-    return { wonRevenue, wonCost, grossMargin, marginPct, hasCostData, pipeline, winRate, avgDeal, funnel, revenueSeries, leakage, leakagePct, seriesWin, aging, quotesThisMonth, wonCount: won.length }
+    return { wonRevenue, grossMargin, marginPct, hasCostData, pipeline, winRate, avgDeal,
+      funnel, byMonthCount, byMonthValue, win, loss, aging, quotesThisMonth, wonCount: won.length, lostCount: lost.length }
   }, [quotes, items])
 
   if (loading) return <div className="text-slate-500">Loading dashboard…</div>
@@ -107,7 +95,6 @@ export default function Dashboard() {
     <div className="space-y-6">
       <h1 className="text-xl font-bold">Sales Dashboard</h1>
 
-      {/* KPI cards */}
       <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
         <Kpi label="Won revenue" value={RM(m.wonRevenue)} sub={`${m.wonCount} deals`} />
         <Kpi label="Gross margin" value={m.hasCostData ? RM(m.grossMargin) : '—'} sub={m.hasCostData ? pct(m.marginPct) : 'add costs in Catalog'} accent />
@@ -117,71 +104,44 @@ export default function Dashboard() {
         <Kpi label="Quotes this month" value={num(m.quotesThisMonth)} />
       </div>
 
+      {/* Funnel (count bars + value line, dual axis) */}
+      <Panel title="Pipeline funnel" hint="Bars = number of quotes · line = total value (RM)">
+        <ResponsiveContainer width="100%" height={260}>
+          <ComposedChart data={m.funnel}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+            <XAxis dataKey="stage" fontSize={12} />
+            <YAxis yAxisId="left" fontSize={11} allowDecimals={false} label={{ value: 'Quotes', angle: -90, position: 'insideLeft', fontSize: 11 }} />
+            <YAxis yAxisId="right" orientation="right" fontSize={11} tickFormatter={(v) => `${v / 1000}k`} label={{ value: 'Value', angle: 90, position: 'insideRight', fontSize: 11 }} />
+            <Tooltip formatter={(v, n) => (n === 'value' ? [RM(v), 'Value'] : [v, 'Quotes'])} />
+            <Bar yAxisId="left" dataKey="count" fill="#0f4c81" radius={[4, 4, 0, 0]} maxBarSize={70} />
+            <Line yAxisId="right" dataKey="value" stroke="#f59e0b" strokeWidth={2} dot={{ r: 3 }} />
+          </ComposedChart>
+        </ResponsiveContainer>
+      </Panel>
+
+      {/* Monthly stacked: count + value */}
       <div className="grid lg:grid-cols-2 gap-6">
-        {/* Revenue vs cost over time */}
-        <Panel title="Selling vs cost by month" hint="Won deals — the gap is your gross margin">
-          {m.revenueSeries.length === 0 ? <Empty /> : (
-            <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={m.revenueSeries}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="month" fontSize={11} />
-                <YAxis fontSize={11} tickFormatter={(v) => `${v / 1000}k`} />
-                <Tooltip formatter={(v, n) => [RM(v), n === 'revenue' ? 'Selling' : 'Cost']} />
-                <Legend formatter={(v) => (v === 'revenue' ? 'Selling' : 'Cost')} wrapperStyle={{ fontSize: 11 }} />
-                <Bar dataKey="revenue" fill="#0f4c81" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="cost" fill="#f59e0b" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          )}
+        <Panel title="Quotes per month" hint="Count, stacked by status (full bar = all quotes)">
+          <MonthlyStacked data={m.byMonthCount} valueFmt={(v) => v} />
         </Panel>
-
-        {/* Funnel */}
-        <Panel title="Pipeline funnel">
-          <div className="space-y-2 py-2">
-            {m.funnel.map((f) => {
-              const max = Math.max(...m.funnel.map((x) => x.value), 1)
-              return (
-                <div key={f.key} className="flex items-center gap-3">
-                  <div className="w-14 text-xs text-slate-500">{f.name}</div>
-                  <div className="flex-1 bg-slate-100 rounded h-7 overflow-hidden">
-                    <div className={`h-full ${STATUS_META[f.key].cls}`} style={{ width: `${(f.value / max) * 100}%` }} />
-                  </div>
-                  <div className="w-8 text-sm font-semibold text-right">{f.value}</div>
-                </div>
-              )
-            })}
-          </div>
-        </Panel>
-
-        {/* Discount leakage */}
-        <Panel title="Discount leakage" hint="How much list value you're giving away in discounts">
-          <div className="flex items-end gap-6 py-2">
-            <div>
-              <div className="text-3xl font-bold text-amber-600">{RM(m.leakage)}</div>
-              <div className="text-sm text-slate-500">{pct(m.leakagePct)} of list value discounted</div>
-            </div>
-          </div>
-          <p className="text-xs text-slate-400 mt-2">Across all quoted line items. Watch this trend — small % cuts compound fast on big-ticket compressors.</p>
-        </Panel>
-
-        {/* Win rate by category */}
-        <Panel title="Win rate by product category">
-          {m.seriesWin.length === 0 ? <Empty msg="No decided quotes yet." /> : (
-            <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={m.seriesWin} layout="vertical">
-                <XAxis type="number" domain={[0, 100]} fontSize={11} tickFormatter={(v) => `${v}%`} />
-                <YAxis type="category" dataKey="series" fontSize={10} width={110} />
-                <Tooltip formatter={(v) => pct(v)} />
-                <Bar dataKey="rate" radius={[0, 4, 4, 0]}>
-                  {m.seriesWin.map((e, i) => <Cell key={i} fill={e.rate >= 50 ? '#16a34a' : '#f59e0b'} />)}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          )}
+        <Panel title="Quote value per month" hint="RM, stacked by status">
+          <MonthlyStacked data={m.byMonthValue} valueFmt={(v) => RM(v)} yTick={(v) => `${v / 1000}k`} />
         </Panel>
       </div>
 
-      {/* Action list: aging / expiring open quotes */}
+      {/* Win / Loss analysis */}
+      <div className="grid lg:grid-cols-2 gap-6">
+        <Panel title="Why we win" hint={`${m.wonCount} won deals`}>
+          <Breakdown title="By reason" data={m.win.reason} color="#16a34a" />
+          <Breakdown title="Won against" data={m.win.brand} color="#0f4c81" />
+        </Panel>
+        <Panel title="Why we lose" hint={`${m.lostCount} lost deals`}>
+          <Breakdown title="By reason" data={m.loss.reason} color="#ef4444" />
+          <Breakdown title="Lost to" data={m.loss.brand} color="#a855f7" />
+        </Panel>
+      </div>
+
+      {/* Action list */}
       <Panel title="Needs follow-up" hint="Open quotes, oldest first — your daily action list">
         {m.aging.length === 0 ? <Empty msg="Nothing open. 🎉" /> : (
           <div className="divide-y">
@@ -195,9 +155,7 @@ export default function Dashboard() {
                   <span className="text-slate-500">{RM(q.total)}</span>
                   <span className="text-xs text-slate-400">{q.age}d old</span>
                   {q.expIn !== null && q.expIn <= 7 && (
-                    <span className="badge bg-amber-100 text-amber-700">
-                      {q.expIn < 0 ? 'expired' : `exp ${q.expIn}d`}
-                    </span>
+                    <span className="badge bg-amber-100 text-amber-700">{q.expIn < 0 ? 'expired' : `exp ${q.expIn}d`}</span>
                   )}
                 </div>
               </div>
@@ -205,6 +163,40 @@ export default function Dashboard() {
           </div>
         )}
       </Panel>
+    </div>
+  )
+}
+
+function MonthlyStacked({ data, valueFmt, yTick }) {
+  if (!data.length) return <Empty />
+  return (
+    <ResponsiveContainer width="100%" height={260}>
+      <BarChart data={data}>
+        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+        <XAxis dataKey="month" fontSize={11} tickFormatter={monthFmt} />
+        <YAxis fontSize={11} allowDecimals={false} tickFormatter={yTick} />
+        <Tooltip formatter={(v, n) => [valueFmt(v), STATUS_META[n]?.label || n]} />
+        <Legend formatter={(n) => STATUS_META[n]?.label || n} wrapperStyle={{ fontSize: 11 }} />
+        {STACK.map((s) => <Bar key={s} dataKey={s} stackId="a" fill={STATUS_COLORS[s]} />)}
+      </BarChart>
+    </ResponsiveContainer>
+  )
+}
+
+function Breakdown({ title, data, color }) {
+  const max = Math.max(...data.map((d) => d.value), 1)
+  return (
+    <div className="mb-3 last:mb-0">
+      <div className="text-xs font-semibold text-slate-400 mb-1">{title}</div>
+      {data.length === 0 ? <div className="text-sm text-slate-400">No data yet.</div> : data.map((d) => (
+        <div key={d.name} className="flex items-center gap-2 mb-1">
+          <div className="w-28 text-xs text-slate-600 truncate">{d.name}</div>
+          <div className="flex-1 bg-slate-100 rounded h-4 overflow-hidden">
+            <div className="h-full rounded" style={{ width: `${(d.value / max) * 100}%`, background: color }} />
+          </div>
+          <div className="w-6 text-xs text-right font-medium">{d.value}</div>
+        </div>
+      ))}
     </div>
   )
 }

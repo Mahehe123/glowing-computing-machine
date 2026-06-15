@@ -1,13 +1,13 @@
 import { RM, fmtDate } from '../lib/format'
 import { lineNet, lineUnitNet, quoteTotals } from '../lib/pricing'
 import { categoryOf } from '../lib/categories'
-import { generalSpecRows, clausesFor, longestLead, leadText } from '../lib/quoteDoc'
+import { generalSpecRows, clausesFor, longestLead, leadText, itemLabel } from '../lib/quoteDoc'
 
 // On-screen review of the quotation, laid out like the PDF (page 1 + spec pages).
 export default function QuoteReview({ quote, items, customer, profile, onClose, onDownload }) {
-  const t = quoteTotals(items, quote.quote_discount_pct, quote.tax_pct)
+  const t = quoteTotals(items, 0, quote.tax_pct)
   const lead = longestLead(items)
-  const specItems = items.filter((it) => it.product)
+  const backItems = items.filter((it) => it.product || (it.is_custom && it.description))
 
   return (
     <div className="fixed inset-0 z-50 bg-black/50 flex flex-col">
@@ -73,8 +73,8 @@ export default function QuoteReview({ quote, items, customer, profile, onClose, 
                 <tr key={i} className="border-b align-top">
                   <td className="p-2">{i + 1}</td>
                   <td className="p-2">
-                    <div className="font-medium">{it.model}</div>
-                    <div className="text-xs text-slate-500">{it.description}</div>
+                    <div className="font-medium">{itemLabel(it)}</div>
+                    {!it.is_custom && it.description && <div className="text-xs text-slate-500">{it.description}</div>}
                   </td>
                   <td className="p-2 text-center">{it.qty}</td>
                   <td className="p-2 text-right">{RM(lineUnitNet(it))}</td>
@@ -87,7 +87,6 @@ export default function QuoteReview({ quote, items, customer, profile, onClose, 
           <div className="flex justify-end mt-3">
             <div className="w-64 text-sm space-y-1">
               <Row label="Subtotal" value={RM(t.subtotal)} />
-              {quote.quote_discount_pct > 0 && <Row label={`Discount (${quote.quote_discount_pct}%)`} value={`- ${RM(t.quoteDiscount)}`} />}
               {quote.tax_pct > 0 && <Row label={`Tax (${quote.tax_pct}%)`} value={RM(t.tax)} />}
               <div className="flex justify-between border-t pt-1 font-bold text-base">
                 <span>Total (MYR)</span><span className="text-brand">{RM(t.total)}</span>
@@ -114,35 +113,38 @@ export default function QuoteReview({ quote, items, customer, profile, onClose, 
           </div>
         </Sheet>
 
-        {/* SPEC PAGES — one per line item */}
-        {specItems.map((it, i) => {
-          const rows = generalSpecRows(it.product)
-          const specs = Object.entries(it.product.specs || {})
-          const clauses = clausesFor(it.product)
-          return (
-            <Sheet key={i}>
-              <div className="border-b-2 border-brand pb-2 mb-3">
-                <div className="text-xs text-slate-400">EQUIPMENT SPECIFICATION</div>
-                <div className="text-lg font-bold">{it.model}</div>
-                <span className="badge bg-brand-light text-brand">{categoryOf(it.product)}</span>
-                <span className="text-sm text-slate-500 ml-2">{it.product.type}</span>
-              </div>
-              <table className="w-full text-sm">
-                <tbody>
-                  {[...rows, ...specs].map(([k, v], idx) => (
-                    <tr key={idx} className="border-b">
-                      <td className="py-1.5 text-slate-500 w-1/2">{k}</td>
-                      <td className="py-1.5 font-medium">{String(v)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <ul className="mt-4 text-[11px] text-slate-500 space-y-0.5">
-                {clauses.map((c, idx) => <li key={idx}>• {c}</li>)}
-              </ul>
-            </Sheet>
-          )
-        })}
+        {/* BACK PAGES — one per equipment (spec) or custom line (description) */}
+        {backItems.map((it, i) => it.product ? (
+          <Sheet key={i}>
+            <div className="border-b-2 border-brand pb-2 mb-3">
+              <div className="text-xs text-slate-400">EQUIPMENT SPECIFICATION</div>
+              <div className="text-lg font-bold">{it.model}</div>
+              <span className="badge bg-brand-light text-brand">{categoryOf(it.product)}</span>
+              <span className="text-sm text-slate-500 ml-2">{it.product.type}</span>
+            </div>
+            <table className="w-full text-sm">
+              <tbody>
+                {[...generalSpecRows(it.product), ...Object.entries(it.product.specs || {})].map(([k, v], idx) => (
+                  <tr key={idx} className="border-b">
+                    <td className="py-1.5 text-slate-500 w-1/2">{k}</td>
+                    <td className="py-1.5 font-medium">{String(v)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <ul className="mt-4 text-[11px] text-slate-500 space-y-0.5">
+              {clausesFor(it.product).map((c, idx) => <li key={idx}>• {c}</li>)}
+            </ul>
+          </Sheet>
+        ) : (
+          <Sheet key={i}>
+            <div className="border-b-2 border-brand pb-2 mb-3">
+              <div className="text-xs text-slate-400">SCOPE OF WORKS</div>
+              <div className="text-lg font-bold">{itemLabel(it)}</div>
+            </div>
+            <div className="text-sm whitespace-pre-line text-slate-700">{it.description}</div>
+          </Sheet>
+        ))}
       </div>
     </div>
   )

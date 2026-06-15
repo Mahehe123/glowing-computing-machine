@@ -16,6 +16,9 @@ export function clausesFor(product) {
   return isCompressor(product) ? [...FAD_CLAUSES, IMPROVEMENT_CLAUSE] : [IMPROVEMENT_CLAUSE]
 }
 
+// Label for a line item: product model, or the custom line's title.
+export const itemLabel = (it) => (it?.is_custom ? (it.title || 'Custom item') : (it?.model || ''))
+
 // Quote shows a range: minimum lead time .. minimum + 2 weeks.
 export function leadRange(weeks) {
   const w = Number(weeks) || 0

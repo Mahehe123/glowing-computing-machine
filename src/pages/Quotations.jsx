@@ -3,11 +3,13 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { RM, fmtDate, daysBetween } from '../lib/format'
 import { STATUS_META, STATUSES } from '../lib/status'
+import OutcomeModal from '../components/OutcomeModal'
 
 export default function Quotations() {
   const [rows, setRows] = useState([])
   const [status, setStatus] = useState('')
   const [q, setQ] = useState('')
+  const [outcomeFor, setOutcomeFor] = useState(null) // { row, mode }
 
   async function load() {
     const { data } = await supabase
@@ -18,8 +20,14 @@ export default function Quotations() {
   }
   useEffect(() => { load() }, [])
 
-  async function setQuoteStatus(id, s) {
-    await supabase.from('quotations').update({ status: s }).eq('id', id)
+  async function setQuoteStatus(row, s) {
+    await supabase.from('quotations').update({ status: s }).eq('id', row.id)
+    if (s === 'won' || s === 'lost') setOutcomeFor({ row, mode: s })
+    load()
+  }
+  async function saveOutcome(fields) {
+    await supabase.from('quotations').update(fields).eq('id', outcomeFor.row.id)
+    setOutcomeFor(null)
     load()
   }
   async function remove(id) {
@@ -72,7 +80,7 @@ export default function Quotations() {
                   </td>
                   <td className="p-3 text-right font-medium">{RM(r.total)}</td>
                   <td className="p-3">
-                    <select value={r.status} onChange={(e) => setQuoteStatus(r.id, e.target.value)}
+                    <select value={r.status} onChange={(e) => setQuoteStatus(r, e.target.value)}
                       className={`badge border-0 ${STATUS_META[r.status]?.cls}`}>
                       {STATUSES.map((s) => <option key={s} value={s}>{STATUS_META[s].label}</option>)}
                     </select>
@@ -87,6 +95,12 @@ export default function Quotations() {
           </tbody>
         </table>
       </div>
+      {outcomeFor && (
+        <OutcomeModal
+          mode={outcomeFor.mode} initial={outcomeFor.row}
+          onSave={saveOutcome} onCancel={() => setOutcomeFor(null)}
+        />
+      )}
     </div>
   )
 }

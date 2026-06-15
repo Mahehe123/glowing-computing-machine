@@ -3,7 +3,7 @@ import autoTable from 'jspdf-autotable'
 import { RM, fmtDate } from './format'
 import { lineNet, lineUnitNet, quoteTotals } from './pricing'
 import { categoryOf } from './categories'
-import { generalSpecRows, clausesFor, longestLead, leadText } from './quoteDoc'
+import { generalSpecRows, clausesFor, longestLead, leadText, itemLabel } from './quoteDoc'
 
 const BRAND = [15, 76, 129]
 
@@ -77,7 +77,7 @@ export function generateQuotePDF({ quote, items, customer, profile }) {
     head: [['#', 'Item', 'Qty', 'Unit (RM)', 'Amount (RM)']],
     body: items.map((it, i) => [
       i + 1,
-      `${it.model || ''}${it.description ? `\n${it.description}` : ''}`,
+      `${itemLabel(it)}${!it.is_custom && it.description ? `\n${it.description}` : ''}`,
       it.qty,
       RM(lineUnitNet(it)),
       RM(lineNet(it)),
@@ -93,11 +93,10 @@ export function generateQuotePDF({ quote, items, customer, profile }) {
   })
 
   // ---------- TOTALS ----------
-  const t = quoteTotals(items, quote.quote_discount_pct, quote.tax_pct)
+  const t = quoteTotals(items, 0, quote.tax_pct)
   let ty = doc.lastAutoTable.finalY + 14
   const rows = [
     ['Subtotal', RM(t.subtotal)],
-    ...(quote.quote_discount_pct ? [[`Quote discount (${quote.quote_discount_pct}%)`, `- ${RM(t.quoteDiscount)}`]] : []),
     ...(quote.tax_pct ? [[`Tax (${quote.tax_pct}%)`, RM(t.tax)]] : []),
   ]
   doc.setFontSize(9)
@@ -137,39 +136,46 @@ export function generateQuotePDF({ quote, items, customer, profile }) {
   doc.text(profile?.signature || 'Prepared by', M, ty + 28)
   doc.setFont('helvetica', 'bold').text(profile?.full_name || '', M, ty + 44)
 
-  // ---------- SPEC PAGES ----------
-  items.filter((it) => it.product).forEach((it) => {
+  // ---------- BACK PAGES: equipment spec (products) or scope of works (custom) ----------
+  items.filter((it) => it.product || (it.is_custom && it.description)).forEach((it) => {
     doc.addPage()
     doc.setTextColor(30)
-    doc.setFontSize(8).setFont('helvetica', 'normal').setTextColor(120)
-    doc.text('EQUIPMENT SPECIFICATION', M, 48)
-    doc.setTextColor(30).setFontSize(16).setFont('helvetica', 'bold')
-    doc.text(it.model || '', M, 66)
-    doc.setFontSize(9).setFont('helvetica', 'normal').setTextColor(90)
-    doc.text(`${categoryOf(it.product)}  ·  ${it.product.type || ''}`, M, 80)
-    doc.setDrawColor(...BRAND).setLineWidth(1.5).line(M, 88, W - M, 88)
-    doc.setTextColor(30)
+    if (it.product) {
+      doc.setFontSize(8).setFont('helvetica', 'normal').setTextColor(120)
+      doc.text('EQUIPMENT SPECIFICATION', M, 48)
+      doc.setTextColor(30).setFontSize(16).setFont('helvetica', 'bold')
+      doc.text(it.model || '', M, 66)
+      doc.setFontSize(9).setFont('helvetica', 'normal').setTextColor(90)
+      doc.text(`${categoryOf(it.product)}  ·  ${it.product.type || ''}`, M, 80)
+      doc.setDrawColor(...BRAND).setLineWidth(1.5).line(M, 88, W - M, 88)
+      doc.setTextColor(30)
 
-    const specRows = [...generalSpecRows(it.product), ...Object.entries(it.product.specs || {})]
-      .map(([k, v]) => [k, String(v)])
+      const specRows = [...generalSpecRows(it.product), ...Object.entries(it.product.specs || {})]
+        .map(([k, v]) => [k, String(v)])
 
-    autoTable(doc, {
-      startY: 100,
-      body: specRows,
-      margin: { left: M, right: M },
-      styles: { fontSize: 9.5, cellPadding: 5 },
-      columnStyles: { 0: { cellWidth: (W - M * 2) / 2, textColor: [90, 90, 90] }, 1: { fontStyle: 'bold' } },
-      theme: 'grid',
-      tableLineColor: [225, 225, 225],
-    })
+      autoTable(doc, {
+        startY: 100,
+        body: specRows,
+        margin: { left: M, right: M },
+        styles: { fontSize: 9.5, cellPadding: 5 },
+        columnStyles: { 0: { cellWidth: (W - M * 2) / 2, textColor: [90, 90, 90] }, 1: { fontStyle: 'bold' } },
+        theme: 'grid',
+        tableLineColor: [225, 225, 225],
+      })
 
-    let cy = doc.lastAutoTable.finalY + 16
-    doc.setFontSize(8).setFont('helvetica', 'normal').setTextColor(110)
-    clausesFor(it.product).forEach((c) => {
-      doc.text(`•  ${c}`, M, cy)
-      cy += 12
-    })
-    doc.setTextColor(30)
+      let cy = doc.lastAutoTable.finalY + 16
+      doc.setFontSize(8).setFont('helvetica', 'normal').setTextColor(110)
+      clausesFor(it.product).forEach((c) => { doc.text(`•  ${c}`, M, cy); cy += 12 })
+      doc.setTextColor(30)
+    } else {
+      doc.setFontSize(8).setFont('helvetica', 'normal').setTextColor(120)
+      doc.text('SCOPE OF WORKS', M, 48)
+      doc.setTextColor(30).setFontSize(16).setFont('helvetica', 'bold')
+      doc.text(itemLabel(it), M, 66)
+      doc.setDrawColor(...BRAND).setLineWidth(1.5).line(M, 74, W - M, 74)
+      doc.setTextColor(40).setFontSize(10).setFont('helvetica', 'normal')
+      doc.text(doc.splitTextToSize(it.description || '', W - M * 2), M, 92)
+    }
   })
 
   // ---------- FOOTER: page numbers on every page ----------
