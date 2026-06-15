@@ -1,18 +1,19 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
-const nav = [
-  { to: '/', label: 'Dashboard', end: true },
-  { to: '/quotes', label: 'Quotations' },
-  { to: '/customers', label: 'Customers' },
-  { to: '/catalog', label: 'Catalog' },
-  { to: '/profile', label: 'My Profile' },
-]
-
 export default function Layout() {
-  const { profile, user, signOut } = useAuth()
+  const { profile, user, signOut, isAdmin } = useAuth()
   const navigate = useNavigate()
   const name = profile?.full_name || user?.email || 'User'
+
+  const nav = [
+    { to: '/', label: 'Dashboard', end: true },
+    { to: '/quotes', label: 'Quotations' },
+    { to: '/customers', label: 'Customers' },
+    { to: '/catalog', label: 'Catalog' },
+    ...(isAdmin ? [{ to: '/users', label: 'Users' }] : []),
+    { to: '/profile', label: 'My Profile' },
+  ]
 
   return (
     <div className="min-h-screen flex flex-col">

@@ -47,12 +47,9 @@ export default function Login() {
             {busy ? '…' : mode === 'signin' ? 'Sign in' : 'Create account'}
           </button>
         </form>
-        <button
-          className="text-xs text-brand mt-4 hover:underline"
-          onClick={() => { setMode(mode === 'signin' ? 'signup' : 'signin'); setMsg(null) }}
-        >
-          {mode === 'signin' ? "New here? Create an account" : 'Have an account? Sign in'}
-        </button>
+        <p className="text-xs text-slate-400 mt-4">
+          Need access? Ask your administrator to create your account.
+        </p>
       </div>
     </div>
   )

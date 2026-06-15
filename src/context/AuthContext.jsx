@@ -35,6 +35,8 @@ export function AuthProvider({ children }) {
     session,
     user: session?.user ?? null,
     profile,
+    isAdmin: profile?.role === 'admin',
+    isActive: profile?.active !== false, // undefined (pre-migration) treated as active
     loading,
     isConfigured,
     refreshProfile: () => loadProfile(session?.user?.id),

@@ -6,6 +6,8 @@
 -- ---------- PROFILES (one per auth user, auto-loaded on login) ----------
 create table if not exists public.profiles (
   id            uuid primary key references auth.users(id) on delete cascade,
+  role          text not null default 'sales',   -- 'admin' | 'sales' (see 04_access_control.sql)
+  active        boolean not null default true,    -- false = access revoked
   full_name     text,
   company_name  text,
   phone         text,
