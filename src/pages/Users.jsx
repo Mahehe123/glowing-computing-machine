@@ -3,12 +3,27 @@ import { Navigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { fmtDate } from '../lib/format'
+import { downloadBackup } from '../lib/backup'
 
 // Admin-only: manage team access (revoke/restore, promote/demote).
 export default function Users() {
   const { isAdmin, user } = useAuth()
   const [rows, setRows] = useState([])
   const [busy, setBusy] = useState(null)
+  const [backupBusy, setBackupBusy] = useState(false)
+  const [backupMsg, setBackupMsg] = useState(null)
+
+  async function runBackup() {
+    setBackupBusy(true); setBackupMsg(null)
+    try {
+      const counts = await downloadBackup()
+      const total = Object.values(counts).reduce((a, b) => a + b, 0)
+      setBackupMsg({ type: 'ok', text: `Downloaded backup of ${total} records. Now upload it to Google Drive.` })
+    } catch (e) {
+      setBackupMsg({ type: 'err', text: e.message })
+    }
+    setBackupBusy(false)
+  }
 
   async function load() {
     const { data } = await supabase.from('profiles').select('*').order('email')
@@ -87,6 +102,21 @@ export default function Users() {
       <p className="text-xs text-slate-400 mt-3">
         Note: "Revoke" instantly blocks all data access (enforced in the database). To permanently delete a login, remove it in Supabase → Authentication → Users.
       </p>
+
+      <div className="card p-5 mt-6 max-w-xl">
+        <h2 className="font-semibold">Data backup</h2>
+        <p className="text-sm text-slate-500 mt-1">
+          Downloads a complete JSON snapshot (products, customers, quotes, profiles) to your computer.
+          <b> Upload it to Google Drive</b> for a safe off-platform copy — the free Supabase tier has no automatic backups.
+          Doing this weekly is a good habit.
+        </p>
+        <button className="btn-primary mt-3" disabled={backupBusy} onClick={runBackup}>
+          {backupBusy ? 'Preparing…' : 'Download backup (.json)'}
+        </button>
+        {backupMsg && (
+          <div className={`text-sm mt-2 ${backupMsg.type === 'err' ? 'text-red-600' : 'text-green-700'}`}>{backupMsg.text}</div>
+        )}
+      </div>
     </div>
   )
 }
