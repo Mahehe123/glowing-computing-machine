@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, Cell,
+  FunnelChart, Funnel, LabelList,
 } from 'recharts'
 import { supabase } from '../lib/supabase'
 import { RM, num, pct, daysBetween } from '../lib/format'
@@ -103,32 +104,30 @@ export default function Dashboard() {
         <Kpi label="Quotes this month" value={num(m.quotesThisMonth)} />
       </div>
 
-      {/* Funnel — split into quantity and value */}
+      {/* Funnel — quantity and value, funnel-chart style */}
       <div className="grid lg:grid-cols-2 gap-6">
         <Panel title="Pipeline funnel — quantity" hint="Number of quotes per stage">
           <ResponsiveContainer width="100%" height={260}>
-            <BarChart data={m.funnel}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="stage" fontSize={12} />
-              <YAxis fontSize={11} allowDecimals={false} />
+            <FunnelChart>
               <Tooltip formatter={(v) => [v, 'Quotes']} />
-              <Bar dataKey="count" radius={[4, 4, 0, 0]} maxBarSize={70}>
+              <Funnel dataKey="count" data={m.funnel} isAnimationActive={false}>
+                <LabelList position="right" dataKey="stage" fill="#334155" stroke="none" fontSize={12} />
+                <LabelList position="center" dataKey="count" fill="#fff" stroke="none" fontSize={13} fontWeight="bold" />
                 {m.funnel.map((d, i) => <Cell key={i} fill={d.fill} />)}
-              </Bar>
-            </BarChart>
+              </Funnel>
+            </FunnelChart>
           </ResponsiveContainer>
         </Panel>
         <Panel title="Pipeline funnel — value" hint="Total value (RM) per stage">
           <ResponsiveContainer width="100%" height={260}>
-            <BarChart data={m.funnel}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="stage" fontSize={12} />
-              <YAxis fontSize={11} tickFormatter={(v) => `${v / 1000}k`} />
+            <FunnelChart>
               <Tooltip formatter={(v) => [RM(v), 'Value']} />
-              <Bar dataKey="value" radius={[4, 4, 0, 0]} maxBarSize={70}>
+              <Funnel dataKey="value" data={m.funnel} isAnimationActive={false}>
+                <LabelList position="right" dataKey="stage" fill="#334155" stroke="none" fontSize={12} />
+                <LabelList position="center" dataKey="value" fill="#fff" stroke="none" fontSize={12} fontWeight="bold" formatter={(v) => `${Math.round(v / 1000)}k`} />
                 {m.funnel.map((d, i) => <Cell key={i} fill={d.fill} />)}
-              </Bar>
-            </BarChart>
+              </Funnel>
+            </FunnelChart>
           </ResponsiveContainer>
         </Panel>
       </div>
