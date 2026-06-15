@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend,
-  ComposedChart, Line,
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, Cell,
 } from 'recharts'
 import { supabase } from '../lib/supabase'
 import { RM, num, pct, daysBetween } from '../lib/format'
@@ -50,10 +49,10 @@ export default function Dashboard() {
     const marginPct = wonRevenue ? (grossMargin / wonRevenue) * 100 : 0
     const hasCostData = wonCost > 0
 
-    // funnel: count (bars) + value (line)
+    // funnel: count and value per stage (two separate charts)
     const funnel = ['draft', 'sent', 'won', 'lost'].map((s) => {
       const list = quotes.filter((q) => q.status === s)
-      return { stage: STATUS_META[s].label, count: list.length, value: Math.round(list.reduce((a, q) => a + Number(q.total || 0), 0)) }
+      return { stage: STATUS_META[s].label, fill: STATUS_COLORS[s], count: list.length, value: Math.round(list.reduce((a, q) => a + Number(q.total || 0), 0)) }
     })
 
     // monthly stacked by status — counts and value
@@ -104,20 +103,35 @@ export default function Dashboard() {
         <Kpi label="Quotes this month" value={num(m.quotesThisMonth)} />
       </div>
 
-      {/* Funnel (count bars + value line, dual axis) */}
-      <Panel title="Pipeline funnel" hint="Bars = number of quotes · line = total value (RM)">
-        <ResponsiveContainer width="100%" height={260}>
-          <ComposedChart data={m.funnel}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-            <XAxis dataKey="stage" fontSize={12} />
-            <YAxis yAxisId="left" fontSize={11} allowDecimals={false} label={{ value: 'Quotes', angle: -90, position: 'insideLeft', fontSize: 11 }} />
-            <YAxis yAxisId="right" orientation="right" fontSize={11} tickFormatter={(v) => `${v / 1000}k`} label={{ value: 'Value', angle: 90, position: 'insideRight', fontSize: 11 }} />
-            <Tooltip formatter={(v, n) => (n === 'value' ? [RM(v), 'Value'] : [v, 'Quotes'])} />
-            <Bar yAxisId="left" dataKey="count" fill="#0f4c81" radius={[4, 4, 0, 0]} maxBarSize={70} />
-            <Line yAxisId="right" dataKey="value" stroke="#f59e0b" strokeWidth={2} dot={{ r: 3 }} />
-          </ComposedChart>
-        </ResponsiveContainer>
-      </Panel>
+      {/* Funnel — split into quantity and value */}
+      <div className="grid lg:grid-cols-2 gap-6">
+        <Panel title="Pipeline funnel — quantity" hint="Number of quotes per stage">
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart data={m.funnel}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="stage" fontSize={12} />
+              <YAxis fontSize={11} allowDecimals={false} />
+              <Tooltip formatter={(v) => [v, 'Quotes']} />
+              <Bar dataKey="count" radius={[4, 4, 0, 0]} maxBarSize={70}>
+                {m.funnel.map((d, i) => <Cell key={i} fill={d.fill} />)}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </Panel>
+        <Panel title="Pipeline funnel — value" hint="Total value (RM) per stage">
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart data={m.funnel}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="stage" fontSize={12} />
+              <YAxis fontSize={11} tickFormatter={(v) => `${v / 1000}k`} />
+              <Tooltip formatter={(v) => [RM(v), 'Value']} />
+              <Bar dataKey="value" radius={[4, 4, 0, 0]} maxBarSize={70}>
+                {m.funnel.map((d, i) => <Cell key={i} fill={d.fill} />)}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </Panel>
+      </div>
 
       {/* Monthly stacked: count + value */}
       <div className="grid lg:grid-cols-2 gap-6">
