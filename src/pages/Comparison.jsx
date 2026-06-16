@@ -21,6 +21,8 @@ export default function Comparison() {
   const [selected, setSelected] = useState(new Set())
   const [inputs, setInputs] = useState(DEFAULT_INPUTS)
   const [showManage, setShowManage] = useState(false)
+  const [q, setQ] = useState('')
+  const [kind, setKind] = useState('')
 
   const company = profile?.company_name || 'Our offer'
 
@@ -44,6 +46,11 @@ export default function Comparison() {
     () => (selectedUnits.length >= 2 ? analyze(selectedUnits, inputs) : null),
     [selectedUnits, inputs],
   )
+
+  const filteredUnits = useMemo(() => units.filter((u) =>
+    (!kind || u.kind === kind) &&
+    (!q || `${u.brand} ${u.model} ${u.type || ''}`.toLowerCase().includes(q.toLowerCase()))
+  ), [units, kind, q])
 
   const toggle = (id) => setSelected((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
   const setIn = (k) => (e) => setInputs((x) => ({ ...x, [k]: Number(e.target.value) }))
@@ -72,10 +79,48 @@ export default function Comparison() {
         </div>
       </div>
 
-      {/* selection */}
-      <div className="grid md:grid-cols-2 gap-4">
-        <Picker title="Your products" empty="No products." items={units.filter((u) => u.kind === 'ours')} selected={selected} toggle={toggle} />
-        <Picker title="Competitors" empty="No competitors yet — add some via Manage competitors." items={units.filter((u) => u.kind === 'comp')} selected={selected} toggle={toggle} />
+      {/* selection: chips + search/filter */}
+      <div className="card p-4 space-y-3">
+        <div className="flex items-center gap-2 flex-wrap min-h-[26px]">
+          <span className="text-xs font-semibold text-slate-500">Comparing:</span>
+          {selectedUnits.length === 0 && <span className="text-xs text-slate-400">nothing yet — search and add below</span>}
+          {selectedUnits.map((u) => (
+            <span key={u.id} className={`badge flex items-center gap-1 ${u.kind === 'ours' ? 'bg-brand-light text-brand' : 'bg-slate-200 text-slate-700'}`}>
+              {u.brand} {u.model}
+              <button onClick={() => toggle(u.id)} className="hover:text-red-600 font-bold">×</button>
+            </span>
+          ))}
+          {selectedUnits.length > 0 && <button className="text-xs text-slate-400 hover:underline" onClick={() => setSelected(new Set())}>clear all</button>}
+        </div>
+
+        <div className="flex gap-2">
+          <input className="input" placeholder="Search brand or model…" value={q} onChange={(e) => setQ(e.target.value)} />
+          <select className="input max-w-[180px]" value={kind} onChange={(e) => setKind(e.target.value)}>
+            <option value="">All sources</option>
+            <option value="ours">Your products</option>
+            <option value="comp">Competitors</option>
+          </select>
+        </div>
+
+        <div className="border rounded-md divide-y max-h-64 overflow-y-auto">
+          {filteredUnits.length === 0 && <div className="p-3 text-sm text-slate-400">No matching units.</div>}
+          {filteredUnits.map((u) => {
+            const on = selected.has(u.id)
+            return (
+              <button key={u.id} onClick={() => toggle(u.id)}
+                className={`w-full text-left p-2.5 flex items-center justify-between gap-2 hover:bg-slate-50 ${on ? 'bg-brand-light/40' : ''}`}>
+                <span className="flex items-center gap-2 min-w-0">
+                  <span className={`badge ${u.kind === 'ours' ? 'bg-brand-light text-brand' : 'bg-slate-100 text-slate-600'}`}>{u.kind === 'ours' ? 'Ours' : 'Competitor'}</span>
+                  <span className="font-medium truncate">{u.brand} {u.model}</span>
+                  <span className="text-xs text-slate-400 truncate hidden sm:inline">
+                    {[u.power_kw && `${u.power_kw}kW`, u.flow_m3min && `${u.flow_m3min} m³/min`, u.is_inverter && 'VSD'].filter(Boolean).join(' · ')}
+                  </span>
+                </span>
+                <span className={`text-sm ${on ? 'text-brand font-bold' : 'text-slate-300'}`}>{on ? '✓' : '+'}</span>
+              </button>
+            )
+          })}
+        </div>
       </div>
 
       {/* inputs */}
@@ -146,28 +191,6 @@ export default function Comparison() {
       )}
 
       {showManage && <CompetitorsModal onClose={() => setShowManage(false)} onChanged={load} />}
-    </div>
-  )
-}
-
-function Picker({ title, items, selected, toggle, empty }) {
-  return (
-    <div className="card p-3">
-      <div className="text-xs font-semibold text-slate-500 mb-2">{title}</div>
-      <div className="max-h-56 overflow-y-auto divide-y">
-        {items.length === 0 && <div className="p-2 text-sm text-slate-400">{empty}</div>}
-        {items.map((u) => (
-          <label key={u.id} className="flex items-center gap-2 p-2 hover:bg-slate-50 cursor-pointer text-sm">
-            <input type="checkbox" checked={selected.has(u.id)} onChange={() => toggle(u.id)} />
-            <span className="flex-1 min-w-0">
-              <span className="font-medium">{u.brand} {u.model}</span>
-              <span className="text-xs text-slate-400 ml-2">
-                {[u.power_kw && `${u.power_kw}kW`, u.flow_m3min && `${u.flow_m3min} m³/min`, u.is_inverter && 'VSD'].filter(Boolean).join(' · ')}
-              </span>
-            </span>
-          </label>
-        ))}
-      </div>
     </div>
   )
 }
