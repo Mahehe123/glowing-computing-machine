@@ -37,6 +37,7 @@ create trigger on_auth_user_created
 create table if not exists public.products (
   id           uuid primary key default gen_random_uuid(),
   model        text not null,
+  brand        text,                         -- usually your company; supports multi-brand
   tpl          text,
   series       text,
   category     text,                        -- derived from series (e.g. "Oil lube compressor")
@@ -49,6 +50,7 @@ create table if not exists public.products (
   cfm_max      numeric,
   price_rm     numeric default 0,           -- selling price (shown to customer)
   cost_rm      numeric default 0,           -- our cost (internal / dashboard only, never on PDF)
+  cost_updated_at timestamptz,              -- when cost was last set (staleness flag)
   lead_time_weeks numeric,                  -- minimum lead time in weeks (quote shows min..min+2)
   specs        jsonb default '{}'::jsonb,   -- all the family-specific attributes
   created_at   timestamptz default now()
@@ -98,6 +100,7 @@ create table if not exists public.quotation_items (
   description  text,
   unit_price   numeric default 0,   -- selling price snapshot at quote time
   unit_cost    numeric default 0,   -- cost snapshot at quote time (for margin analytics)
+  markup_pct   numeric default 0,   -- smart-markup % (selling = cost / (1 - markup%))
   qty          numeric default 1,
   adjust_type  text default 'discount' check (adjust_type in ('discount','markup')),
   adjust_pct   numeric default 0,
@@ -126,6 +129,15 @@ create table if not exists public.competitors (
   created_by       uuid references auth.users(id),
   created_at       timestamptz default now()
 );
+
+-- ---------- APP SETTINGS (single row, admin-editable) ----------
+create table if not exists public.app_settings (
+  id               int primary key default 1,
+  cost_stale_months int not null default 6,
+  updated_at       timestamptz default now(),
+  constraint app_settings_singleton check (id = 1)
+);
+insert into public.app_settings (id) values (1) on conflict (id) do nothing;
 
 -- ============================================================
 -- ROW LEVEL SECURITY

@@ -12,7 +12,7 @@ export default function Layout() {
     { to: '/customers', label: 'Customers' },
     { to: '/catalog', label: 'Catalog' },
     { to: '/comparison', label: 'Comparison' },
-    ...(isAdmin ? [{ to: '/users', label: 'Users' }] : []),
+    ...(isAdmin ? [{ to: '/users', label: 'Users' }, { to: '/settings', label: 'Settings' }] : []),
     { to: '/profile', label: 'My Profile' },
   ]
 

@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { pct } from '../lib/format'
+import { pct, fmtDate } from '../lib/format'
 import { categoryOf, sortCategories } from '../lib/categories'
 import { useAuth } from '../context/AuthContext'
 import SpecModal from '../components/SpecModal'
 import ImportModal from '../components/ImportModal'
+import AddProductModal from '../components/AddProductModal'
 
 // Pull display specs from the family-scoped JSONB (compressors use Loading Pressure;
 // flow lives in core cfm_max for compressors, or specs for dryers/filters).
@@ -21,14 +22,27 @@ export default function Catalog() {
   const [cat, setCat] = useState('')
   const [specProduct, setSpecProduct] = useState(null)
   const [showImport, setShowImport] = useState(false)
-  const { isAdmin } = useAuth()
+  const [showAdd, setShowAdd] = useState(false)
+  const [staleMonths, setStaleMonths] = useState(6)
+  const { isAdmin, profile } = useAuth()
+  const company = profile?.company_name || 'Our brand'
 
   async function load() {
-    const { data } = await supabase.from('products').select('*').order('series').order('model')
+    const [{ data }, { data: s }] = await Promise.all([
+      supabase.from('products').select('*').order('series').order('model'),
+      supabase.from('app_settings').select('cost_stale_months').eq('id', 1).single(),
+    ])
     setRows(data || [])
+    setStaleMonths(s?.cost_stale_months ?? 6)
     setEdits({})
   }
   useEffect(() => { load() }, [])
+
+  const costStale = (r) => {
+    if (!r.cost_updated_at || !r.cost_rm) return false
+    const months = (Date.now() - new Date(r.cost_updated_at)) / (1000 * 60 * 60 * 24 * 30.44)
+    return months > staleMonths
+  }
 
   const setVal = (id, key, v) =>
     setEdits((e) => ({ ...e, [id]: { ...e[id], [key]: v } }))
@@ -45,7 +59,7 @@ export default function Catalog() {
     setSaving(r.id)
     const patch = {}
     if (e.price_rm !== undefined) patch.price_rm = Number(e.price_rm) || 0
-    if (e.cost_rm !== undefined) patch.cost_rm = Number(e.cost_rm) || 0
+    if (e.cost_rm !== undefined) { patch.cost_rm = Number(e.cost_rm) || 0; patch.cost_updated_at = new Date().toISOString() }
     if (e.lead_time_weeks !== undefined) patch.lead_time_weeks = e.lead_time_weeks === '' ? null : Number(e.lead_time_weeks)
     const { error } = await supabase.from('products').update(patch).eq('id', r.id)
     setSaving(null)
@@ -79,7 +93,12 @@ export default function Catalog() {
             powers the margin charts on the dashboard, never appears on a quote).
           </p>
         </div>
-        {isAdmin && <button className="btn-ghost" onClick={() => setShowImport(true)}>Import from Excel</button>}
+        {isAdmin && (
+          <div className="flex gap-2">
+            <button className="btn-ghost" onClick={() => setShowAdd(true)}>+ Add product</button>
+            <button className="btn-ghost" onClick={() => setShowImport(true)}>Import from Excel</button>
+          </div>
+        )}
       </div>
       <div className="flex gap-2 mb-3">
         <input className="input max-w-xs" placeholder="Search…" value={q} onChange={(e) => setQ(e.target.value)} />
@@ -92,6 +111,7 @@ export default function Catalog() {
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-slate-500 text-xs">
             <tr>
+              <th className="text-left p-3">Brand</th>
               <th className="text-left p-3">Model</th>
               <th className="text-left p-3">Category</th>
               <th className="text-right p-3">Loading pressure</th>
@@ -109,6 +129,7 @@ export default function Catalog() {
               const dirty = !!edits[r.id]
               return (
                 <tr key={r.id} className="hover:bg-slate-50">
+                  <td className="p-3 text-sm">{r.brand || company}</td>
                   <td className="p-3"><div className="font-medium">{r.model}</div><div className="text-xs text-slate-400">{r.type}</div></td>
                   <td className="p-3"><span className="badge bg-brand-light text-brand">{categoryOf(r)}</span> <span className="text-xs text-slate-400">{r.series}</span></td>
                   <td className="p-3 text-right text-slate-600">{dash(loadingPressure(r), ' bar')}</td>
@@ -118,6 +139,11 @@ export default function Catalog() {
                   </td>
                   <td className="p-3 text-right">
                     <MoneyInput value={valueOf(r, 'cost_rm')} onChange={(v) => setVal(r.id, 'cost_rm', v)} placeholder="—" />
+                    {r.cost_updated_at && (
+                      <div className={`text-[10px] mt-0.5 ${costStale(r) ? 'text-amber-600 font-medium' : 'text-slate-400'}`}>
+                        {costStale(r) ? '⚠ ' : ''}{fmtDate(r.cost_updated_at)}
+                      </div>
+                    )}
                   </td>
                   <td className={`p-3 text-right font-medium ${m === null ? 'text-slate-300' : m < 15 ? 'text-red-600' : 'text-green-700'}`}>
                     {m === null ? '—' : pct(m)}
@@ -136,13 +162,16 @@ export default function Catalog() {
                 </tr>
               )
             })}
-            {filtered.length === 0 && <tr><td colSpan={9} className="p-6 text-center text-slate-400">No products.</td></tr>}
+            {filtered.length === 0 && <tr><td colSpan={10} className="p-6 text-center text-slate-400">No products.</td></tr>}
           </tbody>
         </table>
       </div>
-      <SpecModal product={specProduct} onClose={() => setSpecProduct(null)} />
+      <SpecModal product={specProduct} editable={isAdmin} onSaved={load} onClose={() => setSpecProduct(null)} />
       {showImport && (
         <ImportModal existing={rows} onClose={() => setShowImport(false)} onDone={load} />
+      )}
+      {showAdd && (
+        <AddProductModal defaultBrand={company} onClose={() => setShowAdd(false)} onDone={load} />
       )}
     </div>
   )

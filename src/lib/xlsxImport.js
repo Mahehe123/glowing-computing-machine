@@ -4,13 +4,13 @@ import { SERIES_CATEGORY } from './categories'
 // Mirrors scripts/generate_products_sql.py — maps an equipment Excel (same headers)
 // into product rows, pulling only each family's spec columns into JSONB `specs`.
 
-const CATEGORY_FAMILY = {
+export const CATEGORY_FAMILY = {
   'Oil free compressor': 'compressor', 'Oil lube compressor': 'compressor',
   'Air Tank': 'tank', 'Air filter': 'filter', 'Dryer': 'dryer',
 }
 
 // Spec headers per family (promoted core columns excluded).
-const FAMILY_SPEC_HEADERS = {
+export const FAMILY_SPEC_HEADERS = {
   compressor: ['Loading Pressure', 'Unload Pressure', 'Min m3/min', 'Max m3/min', 'IE Rating',
     'Motor Type', 'Dimension', 'Outlet size', 'Weight', 'Noise level', 'Power Supply',
     'Outlet air temperature', 'Starter Type', 'Input water flow', 'water pressure', 'Pressure drop'],

@@ -10,6 +10,7 @@ import Catalog from './pages/Catalog'
 import Comparison from './pages/Comparison'
 import Profile from './pages/Profile'
 import Users from './pages/Users'
+import Settings from './pages/Settings'
 import SetupNotice from './components/SetupNotice'
 import AccessBlocked from './components/AccessBlocked'
 
@@ -42,6 +43,7 @@ export default function App() {
         <Route path="/catalog" element={<Catalog />} />
         <Route path="/comparison" element={<Comparison />} />
         <Route path="/users" element={<Users />} />
+        <Route path="/settings" element={<Settings />} />
         <Route path="/profile" element={<Profile />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
