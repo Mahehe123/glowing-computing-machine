@@ -120,6 +120,8 @@ export default function QuotationEditor() {
   )
 
   const totals = useMemo(() => quoteTotals(items, 0, head.tax_pct), [items, head.tax_pct])
+  const totalCost = useMemo(() => items.reduce((s, it) => s + (Number(it.unit_cost) || 0) * (Number(it.qty) || 0), 0), [items])
+  const marginPct = totals.subtotal > 0 ? ((totals.subtotal - totalCost) / totals.subtotal) * 100 : null
   const customer = customers.find((c) => c.id === head.customer_id)
 
   const productById = useMemo(() => Object.fromEntries(products.map((p) => [p.id, p])), [products])
@@ -303,6 +305,15 @@ export default function QuotationEditor() {
           {head.tax_pct > 0 && <Row label={`Tax (${head.tax_pct}%)`} value={RM(totals.tax)} />}
           <div className="border-t pt-2 mt-1 flex justify-between font-bold text-base">
             <span>Total</span><span className="text-brand">{RM(totals.total)}</span>
+          </div>
+          <div className="flex justify-between text-xs text-slate-500 pt-1 border-t border-dashed mt-1">
+            <span>Total cost (internal)</span><span>{RM(totalCost)}</span>
+          </div>
+          <div className="flex justify-between text-xs">
+            <span className="text-slate-500">Margin (internal)</span>
+            <span className={marginPct === null ? 'text-slate-400' : marginPct < 15 ? 'text-red-600 font-medium' : 'text-green-700 font-medium'}>
+              {marginPct === null ? '—' : `${marginPct.toFixed(1)}%`}
+            </span>
           </div>
           {lead && (
             <div className="text-[11px] text-brand-dark bg-brand-light rounded px-2 py-1 mt-1">

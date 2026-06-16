@@ -114,12 +114,10 @@ export default function Catalog() {
                   <td className="p-3 text-right text-slate-600">{dash(loadingPressure(r), ' bar')}</td>
                   <td className="p-3 text-right text-slate-600">{dash(flowCfm(r))}</td>
                   <td className="p-3 text-right">
-                    <input type="number" className="input py-1 w-28 text-right ml-auto"
-                      value={valueOf(r, 'price_rm')} onChange={(e) => setVal(r.id, 'price_rm', e.target.value)} />
+                    <MoneyInput value={valueOf(r, 'price_rm')} onChange={(v) => setVal(r.id, 'price_rm', v)} />
                   </td>
                   <td className="p-3 text-right">
-                    <input type="number" className="input py-1 w-28 text-right ml-auto" placeholder="—"
-                      value={valueOf(r, 'cost_rm')} onChange={(e) => setVal(r.id, 'cost_rm', e.target.value)} />
+                    <MoneyInput value={valueOf(r, 'cost_rm')} onChange={(v) => setVal(r.id, 'cost_rm', v)} placeholder="—" />
                   </td>
                   <td className={`p-3 text-right font-medium ${m === null ? 'text-slate-300' : m < 15 ? 'text-red-600' : 'text-green-700'}`}>
                     {m === null ? '—' : pct(m)}
@@ -147,5 +145,19 @@ export default function Catalog() {
         <ImportModal existing={rows} onClose={() => setShowImport(false)} onDone={load} />
       )}
     </div>
+  )
+}
+
+// Whole-Ringgit input with thousands separators (no decimals).
+function MoneyInput({ value, onChange, placeholder }) {
+  const digits = String(value ?? '').replace(/[^\d]/g, '')
+  const display = digits === '' ? '' : Number(digits).toLocaleString('en-US')
+  return (
+    <input
+      type="text" inputMode="numeric" placeholder={placeholder}
+      className="input py-1 w-32 text-right ml-auto"
+      value={display}
+      onChange={(e) => onChange(e.target.value.replace(/[^\d]/g, ''))}
+    />
   )
 }
