@@ -4,6 +4,12 @@ import { pct } from '../lib/format'
 import { categoryOf, sortCategories } from '../lib/categories'
 import SpecModal from '../components/SpecModal'
 
+// Pull display specs from the family-scoped JSONB (compressors use Loading Pressure;
+// flow lives in core cfm_max for compressors, or specs for dryers/filters).
+const loadingPressure = (p) => p.specs?.['Loading Pressure'] ?? null
+const flowCfm = (p) => p.cfm_max ?? p.specs?.['Flow, cfm'] ?? p.specs?.['filter, cfm'] ?? null
+const dash = (v, suffix = '') => (v === null || v === undefined || v === '' ? '—' : `${v}${suffix}`)
+
 // Product catalog admin: edit selling price + cost (cost is internal, never on a quote PDF).
 export default function Catalog() {
   const [rows, setRows] = useState([])
@@ -79,6 +85,8 @@ export default function Catalog() {
             <tr>
               <th className="text-left p-3">Model</th>
               <th className="text-left p-3">Category</th>
+              <th className="text-right p-3">Loading pressure</th>
+              <th className="text-right p-3">Flow (CFM)</th>
               <th className="text-right p-3">Selling (RM)</th>
               <th className="text-right p-3">Cost (RM)</th>
               <th className="text-right p-3">Margin</th>
@@ -94,6 +102,8 @@ export default function Catalog() {
                 <tr key={r.id} className="hover:bg-slate-50">
                   <td className="p-3"><div className="font-medium">{r.model}</div><div className="text-xs text-slate-400">{r.type}</div></td>
                   <td className="p-3"><span className="badge bg-brand-light text-brand">{categoryOf(r)}</span> <span className="text-xs text-slate-400">{r.series}</span></td>
+                  <td className="p-3 text-right text-slate-600">{dash(loadingPressure(r), ' bar')}</td>
+                  <td className="p-3 text-right text-slate-600">{dash(flowCfm(r))}</td>
                   <td className="p-3 text-right">
                     <input type="number" className="input py-1 w-28 text-right ml-auto"
                       value={valueOf(r, 'price_rm')} onChange={(e) => setVal(r.id, 'price_rm', e.target.value)} />
@@ -119,7 +129,7 @@ export default function Catalog() {
                 </tr>
               )
             })}
-            {filtered.length === 0 && <tr><td colSpan={7} className="p-6 text-center text-slate-400">No products.</td></tr>}
+            {filtered.length === 0 && <tr><td colSpan={9} className="p-6 text-center text-slate-400">No products.</td></tr>}
           </tbody>
         </table>
       </div>
