@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { pct } from '../lib/format'
 import { categoryOf, sortCategories } from '../lib/categories'
+import { useAuth } from '../context/AuthContext'
 import SpecModal from '../components/SpecModal'
+import ImportModal from '../components/ImportModal'
 
 // Pull display specs from the family-scoped JSONB (compressors use Loading Pressure;
 // flow lives in core cfm_max for compressors, or specs for dryers/filters).
@@ -18,6 +20,8 @@ export default function Catalog() {
   const [q, setQ] = useState('')
   const [cat, setCat] = useState('')
   const [specProduct, setSpecProduct] = useState(null)
+  const [showImport, setShowImport] = useState(false)
+  const { isAdmin } = useAuth()
 
   async function load() {
     const { data } = await supabase.from('products').select('*').order('series').order('model')
@@ -67,11 +71,16 @@ export default function Catalog() {
 
   return (
     <div>
-      <h1 className="text-xl font-bold mb-1">Product Catalog</h1>
-      <p className="text-sm text-slate-500 mb-4">
-        Set the <b>selling price</b> (shown to customers) and your <b>cost</b> (internal only —
-        powers the margin charts on the dashboard, never appears on a quote).
-      </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-xl font-bold mb-1">Product Catalog</h1>
+          <p className="text-sm text-slate-500 mb-4">
+            Set the <b>selling price</b> (shown to customers) and your <b>cost</b> (internal only —
+            powers the margin charts on the dashboard, never appears on a quote).
+          </p>
+        </div>
+        {isAdmin && <button className="btn-ghost" onClick={() => setShowImport(true)}>Import from Excel</button>}
+      </div>
       <div className="flex gap-2 mb-3">
         <input className="input max-w-xs" placeholder="Search…" value={q} onChange={(e) => setQ(e.target.value)} />
         <select className="input max-w-[220px]" value={cat} onChange={(e) => setCat(e.target.value)}>
@@ -134,6 +143,9 @@ export default function Catalog() {
         </table>
       </div>
       <SpecModal product={specProduct} onClose={() => setSpecProduct(null)} />
+      {showImport && (
+        <ImportModal existing={rows} onClose={() => setShowImport(false)} onDone={load} />
+      )}
     </div>
   )
 }
