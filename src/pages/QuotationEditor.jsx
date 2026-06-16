@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
+import { useToast } from '../context/ToastContext'
 import { RM, num } from '../lib/format'
 import { lineNet, quoteTotals, sellingUnit } from '../lib/pricing'
 import { STATUSES } from '../lib/status'
@@ -27,6 +28,7 @@ export default function QuotationEditor() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { user, profile } = useAuth()
+  const toast = useToast()
 
   const [products, setProducts] = useState([])
   const [customers, setCustomers] = useState([])
@@ -94,7 +96,7 @@ export default function QuotationEditor() {
   const catOpts = useMemo(() => sortCategories([...new Set(products.map(categoryOf))]), [products])
 
   function addProduct(p) {
-    if (!p.cost_rm) { alert(`Set a cost for ${p.model} in the Catalog before adding it to a quote.`); return }
+    if (!p.cost_rm) { toast(`Set a cost for ${p.model} in the Catalog before quoting it.`, 'warn'); return }
     setItems((prev) => {
       const i = prev.findIndex((it) => it.product_id === p.id)
       if (i >= 0) { const c = [...prev]; c[i] = { ...c[i], qty: c[i].qty + 1 }; return c }
@@ -140,7 +142,7 @@ export default function QuotationEditor() {
   }
 
   async function save() {
-    if (items.length === 0) return alert('Add at least one item.')
+    if (items.length === 0) return toast('Add at least one item.', 'warn')
     setBusy(true)
     const isOutcome = head.status === 'won' || head.status === 'lost'
     const payload = {
@@ -156,10 +158,10 @@ export default function QuotationEditor() {
     let quoteId = id
     if (id) {
       const { error } = await supabase.from('quotations').update(payload).eq('id', id)
-      if (error) { setBusy(false); return alert(error.message) }
+      if (error) { setBusy(false); return toast(error.message, 'error') }
     } else {
       const { data, error } = await supabase.from('quotations').insert(payload).select('id').single()
-      if (error) { setBusy(false); return alert(error.message) }
+      if (error) { setBusy(false); return toast(error.message, 'error') }
       quoteId = data.id
     }
     await supabase.from('quotation_items').delete().eq('quotation_id', quoteId)
@@ -171,9 +173,9 @@ export default function QuotationEditor() {
     }))
     const { error: ie } = await supabase.from('quotation_items').insert(rows)
     setBusy(false)
-    if (ie) return alert(ie.message)
+    if (ie) return toast(ie.message, 'error')
     navigate(`/quotes/${quoteId}`, { replace: true })
-    alert('Quote saved.')
+    toast('Quote saved.', 'success')
   }
 
   const downloadPDF = () => generateQuotePDF({ quote: head, items: docItems, customer, profile })

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { EQUIPMENT_TYPES } from '../lib/categories'
+import { useToast } from '../context/ToastContext'
 
 const STARTERS = ['Star delta', 'Inverter', 'DOL']
 const COOLING = ['Air Cooled', 'Water Cooled']
@@ -21,6 +22,7 @@ const EMPTY = {
 export default function AddProductModal({ defaultBrand, onClose, onDone }) {
   const [f, setF] = useState({ ...EMPTY, brand: defaultBrand || '' })
   const [busy, setBusy] = useState(false)
+  const toast = useToast()
   const set = (k) => (e) => setF((s) => ({ ...s, [k]: e.target.value }))
   const num = (v) => (v === '' ? null : Number(v))
 
@@ -36,9 +38,9 @@ export default function AddProductModal({ defaultBrand, onClose, onDone }) {
 
   async function save(e) {
     e.preventDefault()
-    if (!f.model) return alert('Model is required.')
-    if (!eq) return alert('Equipment is required.')
-    if (powered && !f.kw) return alert('kW is required for compressors and dryers.')
+    if (!f.model) return toast('Model is required.', 'warn')
+    if (!eq) return toast('Equipment is required.', 'warn')
+    if (powered && !f.kw) return toast('kW is required for compressors and dryers.', 'warn')
     setBusy(true)
 
     const specs = {}
@@ -75,7 +77,8 @@ export default function AddProductModal({ defaultBrand, onClose, onDone }) {
     if (row.cost_rm) row.cost_updated_at = new Date().toISOString()
     const { error } = await supabase.from('products').insert(row)
     setBusy(false)
-    if (error) return alert(error.message)
+    if (error) return toast(error.message, 'error')
+    toast('Product added.', 'success')
     onDone?.(); onClose()
   }
 

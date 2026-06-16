@@ -3,6 +3,7 @@ import { RM } from '../lib/format'
 import { categoryOf } from '../lib/categories'
 import { generalSpecRows } from '../lib/quoteDoc'
 import { supabase } from '../lib/supabase'
+import { useToast } from '../context/ToastContext'
 
 const CORE_FIELDS = [
   ['brand', 'Brand', 'text'], ['air_quality', 'Air quality', 'text'], ['wc_ac', 'Cooling', 'text'],
@@ -16,6 +17,7 @@ export default function SpecModal({ product, onClose, editable = false, onSaved 
   const [core, setCore] = useState({})
   const [specs, setSpecs] = useState({})
   const [busy, setBusy] = useState(false)
+  const toast = useToast()
   if (!product) return null
 
   function startEdit() {
@@ -33,7 +35,8 @@ export default function SpecModal({ product, onClose, editable = false, onSaved 
     if (Number(core.price_rm) !== Number(product.price_rm ?? 0)) patch.price_updated_at = new Date().toISOString()
     const { error } = await supabase.from('products').update(patch).eq('id', product.id)
     setBusy(false)
-    if (error) return alert(error.message)
+    if (error) return toast(error.message, 'error')
+    toast('Saved.', 'success')
     onSaved?.(); onClose()
   }
 

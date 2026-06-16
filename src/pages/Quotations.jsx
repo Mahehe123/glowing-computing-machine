@@ -55,8 +55,8 @@ export default function Quotations() {
           {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
       </div>
-      <div className="card overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="card overflow-x-auto">
+        <table className="w-full text-sm min-w-[640px]">
           <thead className="bg-slate-50 text-slate-500 text-xs">
             <tr>
               <th className="text-left p-3">Quote</th>

@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
+import { useToast } from '../context/ToastContext'
 
 // Shared library of T&C templates. Click one to drop it into the quote.
 export default function TermsTemplateModal({ onApply, onClose }) {
   const { user } = useAuth()
+  const toast = useToast()
   const [rows, setRows] = useState([])
   const [name, setName] = useState('')
   const [body, setBody] = useState('')
@@ -26,14 +28,14 @@ export default function TermsTemplateModal({ onApply, onClose }) {
       ? supabase.from('quote_templates').update(payload).eq('id', editing)
       : supabase.from('quote_templates').insert(payload)
     const { error } = await q
-    if (error) return alert(error.message)
+    if (error) return toast(error.message, 'error')
     reset(); load()
   }
 
   async function remove(id) {
     if (!confirm('Delete this template?')) return
     const { error } = await supabase.from('quote_templates').delete().eq('id', id)
-    if (error) alert(error.message); else load()
+    if (error) toast(error.message, 'error'); else load()
   }
 
   return (

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
+import { useToast } from '../context/ToastContext'
 import { RM, fmtDate } from '../lib/format'
 import { STATUS_META } from '../lib/status'
 
@@ -9,6 +10,7 @@ const empty = { company: '', contact_person: '', email: '', phone: '', address: 
 
 export default function Customers() {
   const { user } = useAuth()
+  const toast = useToast()
   const [rows, setRows] = useState([])
   const [quotes, setQuotes] = useState([])
   const [form, setForm] = useState(empty)
@@ -59,8 +61,8 @@ export default function Customers() {
       : supabase.from('customers').insert(payload)
     const { error } = await query
     setBusy(false)
-    if (!error) { setForm(empty); setEditing(null); load() }
-    else alert(error.message)
+    if (!error) { setForm(empty); setEditing(null); load(); toast(editing ? 'Customer updated.' : 'Customer added.', 'success') }
+    else toast(error.message, 'error')
   }
 
   function edit(c) { setEditing(c.id); setForm({ company: c.company, contact_person: c.contact_person || '', email: c.email || '', phone: c.phone || '', address: c.address || '' }) }
@@ -68,7 +70,7 @@ export default function Customers() {
   async function remove(id) {
     if (!confirm('Delete this customer?')) return
     const { error } = await supabase.from('customers').delete().eq('id', id)
-    if (error) alert(error.message); else load()
+    if (error) toast(error.message, 'error'); else load()
   }
 
   const filtered = rows.filter((c) =>

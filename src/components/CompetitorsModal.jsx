@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { parseCompetitorsWorkbook } from '../lib/xlsxImport'
+import { useToast } from '../context/ToastContext'
 
 const empty = {
   brand: '', model: '', type: '', loading_pressure: '', flow_m3min: '', flow_cfm: '',
@@ -11,6 +12,7 @@ const numFields = ['loading_pressure', 'flow_m3min', 'flow_cfm', 'rated_kw', 're
 
 export default function CompetitorsModal({ onClose, onChanged }) {
   const { user } = useAuth()
+  const toast = useToast()
   const [rows, setRows] = useState([])
   const [form, setForm] = useState(empty)
   const [editing, setEditing] = useState(null)
@@ -32,13 +34,13 @@ export default function CompetitorsModal({ onClose, onChanged }) {
 
   async function save(e) {
     e.preventDefault()
-    if (!form.brand || !form.model) return alert('Brand and Model are required.')
+    if (!form.brand || !form.model) return toast('Brand and Model are required.', 'warn')
     const payload = editing ? clean(form) : { ...clean(form), created_by: user.id }
     const q = editing
       ? supabase.from('competitors').update(payload).eq('id', editing)
       : supabase.from('competitors').insert(payload)
     const { error } = await q
-    if (error) return alert(error.message)
+    if (error) return toast(error.message, 'error')
     setForm(empty); setEditing(null); load()
   }
 
@@ -49,7 +51,7 @@ export default function CompetitorsModal({ onClose, onChanged }) {
   async function remove(id) {
     if (!confirm('Delete this competitor model?')) return
     const { error } = await supabase.from('competitors').delete().eq('id', id)
-    if (error) alert(error.message); else load()
+    if (error) toast(error.message, 'error'); else load()
   }
 
   async function onFile(e) {

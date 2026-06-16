@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { pct, fmtDate } from '../lib/format'
 import { categoryOf, sortCategories } from '../lib/categories'
 import { useAuth } from '../context/AuthContext'
+import { useToast } from '../context/ToastContext'
 import SpecModal from '../components/SpecModal'
 import ImportModal from '../components/ImportModal'
 import AddProductModal from '../components/AddProductModal'
@@ -25,6 +26,7 @@ export default function Catalog() {
   const [showAdd, setShowAdd] = useState(false)
   const [staleMonths, setStaleMonths] = useState(6)
   const { isAdmin, profile } = useAuth()
+  const toast = useToast()
   const company = profile?.company_name || 'Our brand'
 
   async function load() {
@@ -63,7 +65,8 @@ export default function Catalog() {
     if (e.lead_time_weeks !== undefined) patch.lead_time_weeks = e.lead_time_weeks === '' ? null : Number(e.lead_time_weeks)
     const { error } = await supabase.from('products').update(patch).eq('id', r.id)
     setSaving(null)
-    if (error) return alert(error.message)
+    if (error) return toast(error.message, 'error')
+    toast('Saved.', 'success')
     setRows((rs) => rs.map((x) => (x.id === r.id ? { ...x, ...patch } : x)))
     setEdits((s) => { const c = { ...s }; delete c[r.id]; return c })
   }

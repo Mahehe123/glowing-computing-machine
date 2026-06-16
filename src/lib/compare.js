@@ -35,7 +35,7 @@ export function productToUnit(p, companyName = 'Our offer') {
     pressure: num(p.specs?.['Loading Pressure']),
     flow_m3min: num(p.specs?.['Max m3/min']) ?? num(p.specs?.['Min m3/min']),
     flow_cfm: num(p.cfm_max),
-    power_kw: num(p.kw),
+    power_kw: num(p.real_kw) ?? num(p.kw),
     noise: num(p.specs?.['Noise level']),
     is_inverter: isInverterType(p.type),
     capex: num(p.price_rm) || 0,

@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
+import { useToast } from '../context/ToastContext'
 import { fmtDate, daysBetween } from '../lib/format'
 import { downloadBackup, getLastBackup } from '../lib/backup'
 
 // Admin-only: manage team access (revoke/restore, promote/demote).
 export default function Users() {
   const { isAdmin, user } = useAuth()
+  const toast = useToast()
   const [rows, setRows] = useState([])
   const [busy, setBusy] = useState(null)
   const [backupBusy, setBackupBusy] = useState(false)
@@ -37,7 +39,7 @@ export default function Users() {
     setBusy(id)
     const { error } = await supabase.from('profiles').update(patch).eq('id', id)
     setBusy(null)
-    if (error) return alert(error.message)
+    if (error) return toast(error.message, 'error')
     load()
   }
 
