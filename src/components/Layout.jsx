@@ -11,6 +11,7 @@ export default function Layout() {
     { to: '/quotes', label: 'Quotations' },
     { to: '/customers', label: 'Customers' },
     { to: '/catalog', label: 'Catalog' },
+    { to: '/comparison', label: 'Comparison' },
     ...(isAdmin ? [{ to: '/users', label: 'Users' }] : []),
     { to: '/profile', label: 'My Profile' },
   ]

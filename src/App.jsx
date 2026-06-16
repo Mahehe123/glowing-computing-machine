@@ -7,6 +7,7 @@ import QuotationEditor from './pages/QuotationEditor'
 import Quotations from './pages/Quotations'
 import Customers from './pages/Customers'
 import Catalog from './pages/Catalog'
+import Comparison from './pages/Comparison'
 import Profile from './pages/Profile'
 import Users from './pages/Users'
 import SetupNotice from './components/SetupNotice'
@@ -39,6 +40,7 @@ export default function App() {
         <Route path="/quotes/:id" element={<QuotationEditor />} />
         <Route path="/customers" element={<Customers />} />
         <Route path="/catalog" element={<Catalog />} />
+        <Route path="/comparison" element={<Comparison />} />
         <Route path="/users" element={<Users />} />
         <Route path="/profile" element={<Profile />} />
       </Route>

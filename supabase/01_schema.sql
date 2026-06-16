@@ -106,6 +106,25 @@ create table if not exists public.quotation_items (
 );
 create index if not exists qitems_quote_idx on public.quotation_items(quotation_id);
 
+-- ---------- COMPETITORS (for the Comparison / TCO tool) ----------
+create table if not exists public.competitors (
+  id               uuid primary key default gen_random_uuid(),
+  brand            text not null,
+  model            text not null,
+  type             text,
+  loading_pressure numeric,
+  flow_m3min       numeric,
+  flow_cfm         numeric,
+  rated_kw         numeric,
+  real_kw          numeric,
+  noise_db         numeric,
+  is_inverter      boolean default false,
+  price_rm         numeric default 0,
+  specs            jsonb default '{}'::jsonb,
+  created_by       uuid references auth.users(id),
+  created_at       timestamptz default now()
+);
+
 -- ============================================================
 -- ROW LEVEL SECURITY
 -- Protection model: the public anon key can reach the API, but every
