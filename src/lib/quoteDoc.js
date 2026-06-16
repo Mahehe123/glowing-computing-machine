@@ -1,7 +1,6 @@
-import { categoryOf } from './categories'
+import { categoryOf, isCompressor } from './categories'
 
-export const COMPRESSOR_CATEGORIES = ['Oil free compressor', 'Oil lube compressor']
-export const isCompressor = (product) => COMPRESSOR_CATEGORIES.includes(categoryOf(product))
+export { isCompressor }
 
 // Clauses printed below each equipment spec table.
 export const FAD_CLAUSES = [

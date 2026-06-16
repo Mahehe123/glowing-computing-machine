@@ -23,14 +23,14 @@ OUT = os.path.join(ROOT, "supabase", "02_products_seed.sql")
 
 # Series (column D) -> category
 SERIES_CATEGORY = {
-    "AB": "Oil free compressor", "OF": "Oil free compressor",
-    "EG": "Oil lube compressor", "EN": "Oil lube compressor", "EQ": "Oil lube compressor",
-    "AT": "Air Tank", "AF": "Air filter", "Dryer": "Dryer",
+    "AB": "Air compressor", "OF": "Air compressor",
+    "EG": "Air compressor", "EN": "Air compressor", "EQ": "Air compressor",
+    "AT": "Air receiver tank", "AF": "Filter", "Dryer": "Dryer",
 }
 # category -> inclusive spec-column range (Excel letters)
 CATEGORY_RANGE = {
-    "Oil free compressor": ("F", "Z"), "Oil lube compressor": ("F", "Z"),
-    "Air Tank": ("AE", "AI"), "Air filter": ("AK", "AQ"), "Dryer": ("AS", "AZ"),
+    "Air compressor": ("F", "Z"),
+    "Air receiver tank": ("AE", "AI"), "Filter": ("AK", "AQ"), "Dryer": ("AS", "AZ"),
 }
 # core/filterable columns promoted to real DB columns: db_col -> Excel letter
 CORE = {

@@ -126,4 +126,35 @@ export function analyze(units, inputs) {
   return { x, rows, winner, payback }
 }
 
+// Cumulative cost (CAPEX + running energy) per unit over the horizon — for the TCO line chart.
+export function tcoOverTime(rows, x) {
+  const out = []
+  for (let y = 0; y <= x.years; y++) {
+    const p = { year: y }
+    rows.forEach((r, i) => { p['u' + i] = Math.round(r.u.capex + (r.energy || 0) * y) })
+    out.push(p)
+  }
+  return out
+}
+
+// CAPEX vs total energy split per unit.
+export function capexEnergySplit(rows, x) {
+  return rows.map((r) => ({
+    name: `${r.u.brand} ${r.u.model}`,
+    capex: Math.round(r.u.capex),
+    energy: Math.round((r.energy || 0) * x.years),
+  }))
+}
+
+// Cumulative savings of `winner` vs `baseline` over the horizon (for ROI curve).
+export function savingsOverTime(winner, baseline, x) {
+  const out = []
+  for (let y = 0; y <= x.years; y++) {
+    const w = winner.u.capex + (winner.energy || 0) * y
+    const b = baseline.u.capex + (baseline.energy || 0) * y
+    out.push({ year: y, savings: Math.round(b - w) })
+  }
+  return out
+}
+
 function num(v) { const n = Number(v); return v === null || v === undefined || v === '' || Number.isNaN(n) ? null : n }

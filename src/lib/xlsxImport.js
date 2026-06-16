@@ -5,8 +5,7 @@ import { SERIES_CATEGORY } from './categories'
 // into product rows, pulling only each family's spec columns into JSONB `specs`.
 
 export const CATEGORY_FAMILY = {
-  'Oil free compressor': 'compressor', 'Oil lube compressor': 'compressor',
-  'Air Tank': 'tank', 'Air filter': 'filter', 'Dryer': 'dryer',
+  'Air compressor': 'compressor', 'Air receiver tank': 'tank', 'Filter': 'filter', 'Dryer': 'dryer',
 }
 
 // Spec headers per family (promoted core columns excluded).

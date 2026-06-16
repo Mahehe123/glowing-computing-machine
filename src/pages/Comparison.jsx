@@ -1,10 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
+import {
+  LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, ReferenceLine,
+} from 'recharts'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { RM, num } from '../lib/format'
 import {
   productToUnit, competitorToUnit, analyze, gradeClasses, DEFAULT_INPUTS,
+  tcoOverTime, capexEnergySplit, savingsOverTime, annualEnergy, annualCO2,
 } from '../lib/compare'
+
+const LINE_COLORS = ['#0f4c81', '#ef4444', '#16a34a', '#a855f7', '#f59e0b']
 import { generateComparePDF } from '../lib/comparePdf'
 import CompetitorsModal from '../components/CompetitorsModal'
 
@@ -65,6 +71,29 @@ export default function Comparison() {
       co2: gradeClasses(analysis.rows.map((r) => r.co2)),
       footprint: gradeClasses(analysis.rows.map((r) => r.u.dim?.footprint_m2 ?? null)),
       weight: gradeClasses(analysis.rows.map((r) => r.u.weight ?? null)),
+    }
+  }, [analysis])
+
+  const analytics = useMemo(() => {
+    if (!analysis) return null
+    const { x, rows, winner } = analysis
+    const others = rows.filter((r) => r !== winner && r.tco !== null)
+    const baseline = others.length ? others.reduce((a, b) => (b.tco > a.tco ? b : a)) : null
+    const pair = winner && baseline
+    const nYrSaving = pair ? baseline.tco - winner.tco : null
+    const premium = pair ? winner.u.capex - baseline.u.capex : null
+    const roiPct = premium > 0 && nYrSaving != null ? (nYrSaving / premium) * 100 : null
+    const co2SaveYr = pair ? (annualCO2(baseline.u, x) || 0) - (annualCO2(winner.u, x) || 0) : null
+    const xHi = { ...x, tariff: x.tariff * 1.2 }
+    const gapHi = pair
+      ? (baseline.u.capex + (annualEnergy(baseline.u, xHi) || 0) * x.years) - (winner.u.capex + (annualEnergy(winner.u, xHi) || 0) * x.years)
+      : null
+    return {
+      x, rows, winner, baseline,
+      tcoData: tcoOverTime(rows, x),
+      splitData: capexEnergySplit(rows, x),
+      savingsData: pair ? savingsOverTime(winner, baseline, x) : null,
+      nYrSaving, premium, roiPct, co2SaveYr, gapNow: nYrSaving, gapHi,
     }
   }, [analysis])
 
@@ -232,6 +261,72 @@ export default function Comparison() {
               </div>
             )}
           </div>
+          {/* Lifetime cost analysis */}
+          <div className="grid lg:grid-cols-2 gap-6">
+            <div className="card p-4">
+              <h2 className="font-semibold text-sm mb-1">Cumulative cost over {analytics.x.years} years</h2>
+              <p className="text-xs text-slate-400 mb-2">CAPEX + running energy. Where lines cross is the break-even point.</p>
+              <ResponsiveContainer width="100%" height={240}>
+                <LineChart data={analytics.tcoData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="year" fontSize={11} tickFormatter={(y) => `Y${y}`} />
+                  <YAxis fontSize={11} tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
+                  <Tooltip formatter={(v, n) => [RM(v), analytics.rows[Number(n.slice(1))]?.u.brand + ' ' + analytics.rows[Number(n.slice(1))]?.u.model]} labelFormatter={(y) => `Year ${y}`} />
+                  {analytics.rows.map((r, i) => (
+                    <Line key={i} dataKey={'u' + i} stroke={LINE_COLORS[i % LINE_COLORS.length]} strokeWidth={2} dot={false} name={'u' + i} />
+                  ))}
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+
+            <div className="card p-4">
+              <h2 className="font-semibold text-sm mb-1">CAPEX vs energy ({analytics.x.years}-yr)</h2>
+              <p className="text-xs text-slate-400 mb-2">On a compressor, energy usually dwarfs the purchase price.</p>
+              <ResponsiveContainer width="100%" height={240}>
+                <BarChart data={analytics.splitData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="name" fontSize={10} />
+                  <YAxis fontSize={11} tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
+                  <Tooltip formatter={(v, n) => [RM(v), n === 'capex' ? 'CAPEX' : 'Energy']} />
+                  <Legend formatter={(n) => (n === 'capex' ? 'CAPEX' : 'Energy')} wrapperStyle={{ fontSize: 11 }} />
+                  <Bar dataKey="capex" stackId="a" fill="#0f4c81" />
+                  <Bar dataKey="energy" stackId="a" fill="#f59e0b" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {analytics.savingsData && (
+            <div className="card p-4">
+              <div className="flex flex-wrap items-baseline justify-between gap-2 mb-1">
+                <h2 className="font-semibold text-sm">Return vs {analytics.baseline.u.brand} {analytics.baseline.u.model}</h2>
+                <div className="text-xs text-slate-500">
+                  {analytics.roiPct != null && <span className="mr-3">ROI <b className="text-green-700">{Math.round(analytics.roiPct)}%</b></span>}
+                  {analytics.nYrSaving > 0 && <span>{analytics.x.years}-yr saving <b className="text-green-700">{RM(analytics.nYrSaving)}</b></span>}
+                </div>
+              </div>
+              <p className="text-xs text-slate-400 mb-2">Cumulative savings of {analytics.winner.u.brand} {analytics.winner.u.model}. Crosses zero at break-even.</p>
+              <ResponsiveContainer width="100%" height={220}>
+                <LineChart data={analytics.savingsData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="year" fontSize={11} tickFormatter={(y) => `Y${y}`} />
+                  <YAxis fontSize={11} tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
+                  <Tooltip formatter={(v) => [RM(v), 'Cumulative saving']} labelFormatter={(y) => `Year ${y}`} />
+                  <ReferenceLine y={0} stroke="#94a3b8" />
+                  <Line dataKey="savings" stroke="#16a34a" strokeWidth={2} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3 text-sm">
+                {analytics.gapHi != null && (
+                  <Stat label="Saving if tariff +20%" value={RM(analytics.gapHi)} sub={`vs ${RM(analytics.gapNow)} now`} />
+                )}
+                {analytics.co2SaveYr > 0 && <>
+                  <Stat label="CO₂ saved / yr" value={`${num(analytics.co2SaveYr)} kg`} />
+                  <Stat label="≈ equivalent" value={`${(analytics.co2SaveYr / 4600).toFixed(1)} cars`} sub={`or ${Math.round(analytics.co2SaveYr / 21)} trees/yr`} />
+                </>}
+              </div>
+            </div>
+          )}
         </>
       )}
 
@@ -256,6 +351,16 @@ function In({ label, v, on, step }) {
     <div>
       <label className="label">{label}</label>
       <input type="number" step={step} className="input py-1" value={v} onChange={on} />
+    </div>
+  )
+}
+
+function Stat({ label, value, sub }) {
+  return (
+    <div className="bg-slate-50 rounded-md p-2.5">
+      <div className="text-xs text-slate-500">{label}</div>
+      <div className="font-bold text-brand">{value}</div>
+      {sub && <div className="text-[11px] text-slate-400">{sub}</div>}
     </div>
   )
 }
