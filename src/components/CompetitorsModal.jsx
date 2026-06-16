@@ -5,9 +5,9 @@ import { parseCompetitorsWorkbook } from '../lib/xlsxImport'
 
 const empty = {
   brand: '', model: '', type: '', loading_pressure: '', flow_m3min: '', flow_cfm: '',
-  rated_kw: '', real_kw: '', noise_db: '', price_rm: '', is_inverter: false,
+  rated_kw: '', real_kw: '', noise_db: '', dimension: '', weight_kg: '', price_rm: '', is_inverter: false,
 }
-const numFields = ['loading_pressure', 'flow_m3min', 'flow_cfm', 'rated_kw', 'real_kw', 'noise_db', 'price_rm']
+const numFields = ['loading_pressure', 'flow_m3min', 'flow_cfm', 'rated_kw', 'real_kw', 'noise_db', 'weight_kg', 'price_rm']
 
 export default function CompetitorsModal({ onClose, onChanged }) {
   const { user } = useAuth()
@@ -92,6 +92,8 @@ export default function CompetitorsModal({ onClose, onChanged }) {
           <Field label="Rated kW" type="number" value={form.rated_kw} onChange={set('rated_kw')} />
           <Field label="Real kW" type="number" value={form.real_kw} onChange={set('real_kw')} />
           <Field label="Noise dB" type="number" value={form.noise_db} onChange={set('noise_db')} />
+          <Field label="Dimension (L x W x H mm)" value={form.dimension} onChange={set('dimension')} />
+          <Field label="Weight kg" type="number" value={form.weight_kg} onChange={set('weight_kg')} />
           <Field label="Price RM" type="number" value={form.price_rm} onChange={set('price_rm')} />
           <label className="flex items-center gap-2 text-xs text-slate-600 mt-4">
             <input type="checkbox" checked={form.is_inverter} onChange={set('is_inverter')} /> Inverter / VSD

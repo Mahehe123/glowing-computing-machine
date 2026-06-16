@@ -15,6 +15,19 @@ export const DEFAULT_INPUTS = {
 
 const isInverterType = (t) => /inverter|vfd|vsd|variable/i.test(t || '')
 
+// Parse an "L x W x H" string (mm) into numbers + footprint (m²) + volume (m³).
+export function parseDim(str) {
+  if (!str) return null
+  const nums = String(str).match(/\d+(?:\.\d+)?/g)
+  if (!nums || nums.length < 2) return null
+  const [l, w, h] = nums.map(Number)
+  return {
+    l: l ?? null, w: w ?? null, h: h ?? null,
+    footprint_m2: l && w ? (l * w) / 1e6 : null,
+    volume_m3: l && w && h ? (l * w * h) / 1e9 : null,
+  }
+}
+
 // Normalise a catalog product -> comparable unit (brand = your company).
 export function productToUnit(p, companyName = 'Our offer') {
   return {
@@ -26,6 +39,8 @@ export function productToUnit(p, companyName = 'Our offer') {
     noise: num(p.specs?.['Noise level']),
     is_inverter: isInverterType(p.type),
     capex: num(p.price_rm) || 0,
+    dim: parseDim(p.specs?.['Dimension'] || p.specs?.['filter dimension'] || p.specs?.['tank dimension']),
+    weight: num(p.specs?.['Weight']) ?? num(p.specs?.['Weight, KG']) ?? num(p.specs?.['filter weight']),
   }
 }
 
@@ -40,6 +55,8 @@ export function competitorToUnit(c) {
     noise: num(c.noise_db),
     is_inverter: !!c.is_inverter || isInverterType(c.type),
     capex: num(c.price_rm) || 0,
+    dim: parseDim(c.dimension),
+    weight: num(c.weight_kg),
   }
 }
 

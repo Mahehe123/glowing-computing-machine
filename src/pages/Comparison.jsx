@@ -63,6 +63,8 @@ export default function Comparison() {
       energy: gradeClasses(analysis.rows.map((r) => r.energy)),
       tco: gradeClasses(analysis.rows.map((r) => r.tco)),
       co2: gradeClasses(analysis.rows.map((r) => r.co2)),
+      footprint: gradeClasses(analysis.rows.map((r) => r.u.dim?.footprint_m2 ?? null)),
+      weight: gradeClasses(analysis.rows.map((r) => r.u.weight ?? null)),
     }
   }, [analysis])
 
@@ -187,6 +189,49 @@ export default function Comparison() {
               )}
             </div>
           )}
+
+          {/* Dimensions & footprint */}
+          <div className="card p-4">
+            <h2 className="font-semibold text-sm mb-1">Dimensions &amp; footprint</h2>
+            <p className="text-xs text-slate-400 mb-3">Floor space and weight — often the deciding factor in a tight plant room.</p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-slate-50 text-xs">
+                    <th className="text-left p-3 text-slate-500">Metric</th>
+                    {analysis.rows.map((r) => (
+                      <th key={r.u.id} className="p-3 text-center"><div className="font-bold">{r.u.brand}</div><div className="text-xs text-slate-400 font-normal">{r.u.model}</div></th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  <Metric label="L × W × H (mm)" units={analysis.rows} get={(r) => (r.u.dim ? `${fmt(r.u.dim.l)} × ${fmt(r.u.dim.w)} × ${fmt(r.u.dim.h)}` : '—')} />
+                  <Metric label="Footprint (m²)" units={analysis.rows} get={(r) => (r.u.dim?.footprint_m2 ? r.u.dim.footprint_m2.toFixed(2) : '—')} grade={grades.footprint} bold />
+                  <Metric label="Volume (m³)" units={analysis.rows} get={(r) => (r.u.dim?.volume_m3 ? r.u.dim.volume_m3.toFixed(2) : '—')} />
+                  <Metric label="Weight (kg)" units={analysis.rows} get={(r) => fmt(r.u.weight)} grade={grades.weight} />
+                </tbody>
+              </table>
+            </div>
+
+            {/* footprint bars */}
+            {analysis.rows.some((r) => r.u.dim?.footprint_m2) && (
+              <div className="mt-4 space-y-2">
+                <div className="text-xs font-semibold text-slate-400">Relative footprint</div>
+                {(() => {
+                  const max = Math.max(...analysis.rows.map((r) => r.u.dim?.footprint_m2 || 0), 0.01)
+                  return analysis.rows.map((r) => (
+                    <div key={r.u.id} className="flex items-center gap-2">
+                      <div className="w-32 text-xs text-slate-600 truncate">{r.u.brand} {r.u.model}</div>
+                      <div className="flex-1 bg-slate-100 rounded h-5 overflow-hidden">
+                        <div className="h-full rounded bg-brand/70" style={{ width: `${((r.u.dim?.footprint_m2 || 0) / max) * 100}%` }} />
+                      </div>
+                      <div className="w-16 text-xs text-right font-medium">{r.u.dim?.footprint_m2 ? `${r.u.dim.footprint_m2.toFixed(2)} m²` : '—'}</div>
+                    </div>
+                  ))
+                })()}
+              </div>
+            )}
+          </div>
         </>
       )}
 

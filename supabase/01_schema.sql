@@ -118,6 +118,8 @@ create table if not exists public.competitors (
   rated_kw         numeric,
   real_kw          numeric,
   noise_db         numeric,
+  dimension        text,
+  weight_kg        numeric,
   is_inverter      boolean default false,
   price_rm         numeric default 0,
   specs            jsonb default '{}'::jsonb,

@@ -39,7 +39,10 @@ export function generateComparePDF({ analysis, profile }) {
   const energyVals = rows.map((r) => r.energy)
   const tcoVals = rows.map((r) => r.tco)
   const co2Vals = rows.map((r) => r.co2)
-  const gSer = gradeClasses(serVals), gEnergy = gradeClasses(energyVals), gTco = gradeClasses(tcoVals), gCo2 = gradeClasses(co2Vals)
+  const footVals = units.map((u) => u.dim?.footprint_m2 ?? null)
+  const weightVals = units.map((u) => u.weight ?? null)
+  const gSer = gradeClasses(serVals), gEnergy = gradeClasses(energyVals), gTco = gradeClasses(tcoVals)
+  const gCo2 = gradeClasses(co2Vals), gFoot = gradeClasses(footVals), gWeight = gradeClasses(weightVals)
 
   const body = [
     ['Type', ...units.map((u) => u.type || '—')],
@@ -52,9 +55,12 @@ export function generateComparePDF({ analysis, profile }) {
     [`Energy / yr`, ...rows.map((r) => (r.energy === null ? '—' : RM(r.energy)))],
     [`${x.years}-yr TCO`, ...rows.map((r) => (r.tco === null ? '—' : RM(r.tco)))],
     ['CO₂ / yr (kg)', ...rows.map((r) => (r.co2 === null ? '—' : num(r.co2)))],
+    ['Dimensions (mm)', ...units.map((u) => (u.dim ? `${fmt(u.dim.l)}×${fmt(u.dim.w)}×${fmt(u.dim.h)}` : '—'))],
+    ['Footprint (m²)', ...units.map((u) => (u.dim?.footprint_m2 ? u.dim.footprint_m2.toFixed(2) : '—'))],
+    ['Weight (kg)', ...units.map((u) => fmt(u.weight))],
   ]
   // map row index -> grade array
-  const gradeForRow = { 6: gSer, 7: gEnergy, 8: gTco, 9: gCo2 }
+  const gradeForRow = { 6: gSer, 7: gEnergy, 8: gTco, 9: gCo2, 11: gFoot, 12: gWeight }
 
   autoTable(doc, {
     startY: 100,

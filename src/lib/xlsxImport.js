@@ -46,6 +46,8 @@ const COMP_ALIASES = {
   flow_m3min: ['flow (m3/min)', 'flow m3/min', 'capacity (m3/min)', 'capacity', 'fad (m3/min)', 'fad', 'm3/min'],
   flow_cfm: ['flow (cfm)', 'flow cfm', 'cfm', 'capacity (cfm)'],
   noise_db: ['noise level (db(a))', 'noise (db(a))', 'noise level', 'noise', 'db(a)', 'db'],
+  dimension: ['dimension', 'dimension (mm)', 'dimensions', 'lxwxh', 'l x w x h', 'size'],
+  weight_kg: ['weight (kg)', 'weight kg', 'weight', 'kg'],
   price_rm: ['price (rm)', 'price', 'capex', 'rm/ unit', 'rm/unit', 'cost'],
 }
 
@@ -77,6 +79,8 @@ export async function parseCompetitorsWorkbook(file) {
       flow_m3min: numOrNull(pick(get, COMP_ALIASES.flow_m3min)),
       flow_cfm: numOrNull(pick(get, COMP_ALIASES.flow_cfm)),
       noise_db: numOrNull(pick(get, COMP_ALIASES.noise_db)),
+      dimension: pick(get, COMP_ALIASES.dimension),
+      weight_kg: numOrNull(pick(get, COMP_ALIASES.weight_kg)),
       price_rm: roundMoney(pick(get, COMP_ALIASES.price_rm)) || 0,
       is_inverter: /inverter|vfd|vsd|variable/i.test(type || ''),
     })
