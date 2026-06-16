@@ -30,6 +30,7 @@ export default function SpecModal({ product, onClose, editable = false, onSaved 
     const patch = { specs }
     for (const [k, , type] of CORE_FIELDS) patch[k] = type === 'number' ? (core[k] === '' ? null : Number(core[k])) : (core[k] || null)
     if (Number(core.cost_rm) !== Number(product.cost_rm ?? 0)) patch.cost_updated_at = new Date().toISOString()
+    if (Number(core.price_rm) !== Number(product.price_rm ?? 0)) patch.price_updated_at = new Date().toISOString()
     const { error } = await supabase.from('products').update(patch).eq('id', product.id)
     setBusy(false)
     if (error) return alert(error.message)

@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
-import { fmtDate } from '../lib/format'
-import { downloadBackup } from '../lib/backup'
+import { fmtDate, daysBetween } from '../lib/format'
+import { downloadBackup, getLastBackup } from '../lib/backup'
 
 // Admin-only: manage team access (revoke/restore, promote/demote).
 export default function Users() {
@@ -110,7 +110,15 @@ export default function Users() {
           <b> Upload it to Google Drive</b> for a safe off-platform copy — the free Supabase tier has no automatic backups.
           Doing this weekly is a good habit.
         </p>
-        <button className="btn-primary mt-3" disabled={backupBusy} onClick={runBackup}>
+        {(() => {
+          const last = getLastBackup()
+          const days = last ? daysBetween(last) : null
+          if (!last) return <div className="text-xs text-amber-600 mt-2">⚠ No backup taken on this device yet.</div>
+          return <div className={`text-xs mt-2 ${days > 7 ? 'text-amber-600' : 'text-slate-400'}`}>
+            {days > 7 ? '⚠ ' : ''}Last backup: {fmtDate(last)} ({days === 0 ? 'today' : `${days}d ago`})
+          </div>
+        })()}
+        <button className="btn-primary mt-2" disabled={backupBusy} onClick={runBackup}>
           {backupBusy ? 'Preparing…' : 'Download backup (.json)'}
         </button>
         {backupMsg && (

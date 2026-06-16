@@ -4,6 +4,12 @@ import { supabase } from './supabase'
 // They then upload it to Google Drive (off-platform, version-historied copy).
 // Admin reads every table (allowed by RLS); restore is possible from this file.
 const TABLES = ['profiles', 'products', 'customers', 'quotations', 'quotation_items']
+const LAST_BACKUP_KEY = 'airquote_last_backup'
+
+export const getLastBackup = () => {
+  const v = localStorage.getItem(LAST_BACKUP_KEY)
+  return v ? new Date(v) : null
+}
 
 export async function downloadBackup() {
   const data = { app: 'AirQuote', exported_at: new Date().toISOString(), tables: {} }
@@ -25,5 +31,6 @@ export async function downloadBackup() {
   a.click()
   a.remove()
   URL.revokeObjectURL(url)
+  localStorage.setItem(LAST_BACKUP_KEY, new Date().toISOString())
   return counts
 }

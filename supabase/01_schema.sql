@@ -46,11 +46,13 @@ create table if not exists public.products (
   wc_ac        text,
   kw           numeric,
   hp           numeric,
+  real_kw      numeric,                      -- actual/input power for comparison energy calcs
   cfm_min      numeric,
   cfm_max      numeric,
   price_rm     numeric default 0,           -- selling price (shown to customer)
   cost_rm      numeric default 0,           -- our cost (internal / dashboard only, never on PDF)
   cost_updated_at timestamptz,              -- when cost was last set (staleness flag)
+  price_updated_at timestamptz,             -- when selling price last changed (audit)
   lead_time_weeks numeric,                  -- minimum lead time in weeks (quote shows min..min+2)
   specs        jsonb default '{}'::jsonb,   -- all the family-specific attributes
   created_at   timestamptz default now()

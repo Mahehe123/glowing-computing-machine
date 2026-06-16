@@ -7,6 +7,7 @@ import { supabase } from '../lib/supabase'
 import { RM, num, pct, daysBetween } from '../lib/format'
 import { OPEN_STATUSES, STATUS_META } from '../lib/status'
 import { reasonLabel, competitorLabel } from '../lib/outcome'
+import { sweepExpired } from '../lib/quotes'
 
 const STATUS_COLORS = { draft: '#94a3b8', sent: '#f59e0b', won: '#16a34a', lost: '#ef4444', expired: '#a855f7' }
 const STACK = ['won', 'lost', 'sent', 'expired', 'draft']
@@ -18,6 +19,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     ;(async () => {
+      await sweepExpired()
       const { data: q } = await supabase.from('quotations').select('*, customers(company)')
       setQuotes(q || [])
       setLoading(false)

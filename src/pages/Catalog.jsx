@@ -58,7 +58,7 @@ export default function Catalog() {
     if (!e) return
     setSaving(r.id)
     const patch = {}
-    if (e.price_rm !== undefined) patch.price_rm = Number(e.price_rm) || 0
+    if (e.price_rm !== undefined) { patch.price_rm = Number(e.price_rm) || 0; patch.price_updated_at = new Date().toISOString() }
     if (e.cost_rm !== undefined) { patch.cost_rm = Number(e.cost_rm) || 0; patch.cost_updated_at = new Date().toISOString() }
     if (e.lead_time_weeks !== undefined) patch.lead_time_weeks = e.lead_time_weeks === '' ? null : Number(e.lead_time_weeks)
     const { error } = await supabase.from('products').update(patch).eq('id', r.id)

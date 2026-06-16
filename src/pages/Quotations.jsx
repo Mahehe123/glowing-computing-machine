@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { RM, fmtDate, daysBetween } from '../lib/format'
 import { STATUS_META, STATUSES } from '../lib/status'
+import { sweepExpired } from '../lib/quotes'
 import OutcomeModal from '../components/OutcomeModal'
 
 export default function Quotations() {
@@ -12,6 +13,7 @@ export default function Quotations() {
   const [outcomeFor, setOutcomeFor] = useState(null) // { row, mode }
 
   async function load() {
+    await sweepExpired()
     const { data } = await supabase
       .from('quotations')
       .select('*, customers(company)')
