@@ -14,17 +14,12 @@ const monthFmt = (k) => k // 'YYYY-MM'
 
 export default function Dashboard() {
   const [quotes, setQuotes] = useState([])
-  const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     ;(async () => {
-      const [{ data: q }, { data: it }] = await Promise.all([
-        supabase.from('quotations').select('*, customers(company)'),
-        supabase.from('quotation_items').select('unit_cost, qty, quotation_id, quotations(status)'),
-      ])
+      const { data: q } = await supabase.from('quotations').select('*, customers(company)')
       setQuotes(q || [])
-      setItems(it || [])
       setLoading(false)
     })()
   }, [])
@@ -38,16 +33,6 @@ export default function Dashboard() {
     const decided = won.length + lost.length
     const winRate = decided ? (won.length / decided) * 100 : 0
     const avgDeal = won.length ? wonRevenue / won.length : 0
-
-    // gross margin (cost snapshotted on won quotes)
-    const costByQuote = {}
-    items.forEach((it) => {
-      costByQuote[it.quotation_id] = (costByQuote[it.quotation_id] || 0) + (Number(it.unit_cost) || 0) * (Number(it.qty) || 0)
-    })
-    const wonCost = won.reduce((s, q) => s + (costByQuote[q.id] || 0), 0)
-    const grossMargin = wonRevenue - wonCost
-    const marginPct = wonRevenue ? (grossMargin / wonRevenue) * 100 : 0
-    const hasCostData = wonCost > 0
 
     // funnel: count and value per stage (two separate charts)
     const funnel = ['draft', 'sent', 'won', 'lost'].map((s) => {
@@ -84,9 +69,9 @@ export default function Dashboard() {
     const thisMonth = new Date().toISOString().slice(0, 7)
     const quotesThisMonth = quotes.filter((q) => (q.quote_date || '').startsWith(thisMonth)).length
 
-    return { wonRevenue, grossMargin, marginPct, hasCostData, pipeline, winRate, avgDeal,
+    return { wonRevenue, pipeline, winRate, avgDeal,
       funnel, byMonthCount, byMonthValue, win, loss, aging, quotesThisMonth, wonCount: won.length, lostCount: lost.length }
-  }, [quotes, items])
+  }, [quotes])
 
   if (loading) return <div className="text-slate-500">Loading dashboard…</div>
 
@@ -94,9 +79,8 @@ export default function Dashboard() {
     <div className="space-y-6">
       <h1 className="text-xl font-bold">Sales Dashboard</h1>
 
-      <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
-        <Kpi label="Won revenue" value={RM(m.wonRevenue)} sub={`${m.wonCount} deals`} />
-        <Kpi label="Gross margin" value={m.hasCostData ? RM(m.grossMargin) : '—'} sub={m.hasCostData ? pct(m.marginPct) : 'add costs in Catalog'} accent />
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+        <Kpi label="Won revenue" value={RM(m.wonRevenue)} sub={`${m.wonCount} deals`} accent />
         <Kpi label="Open pipeline" value={RM(m.pipeline)} sub="live quotes" />
         <Kpi label="Win rate" value={pct(m.winRate)} sub="won / decided" />
         <Kpi label="Avg deal size" value={RM(m.avgDeal)} />

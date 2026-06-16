@@ -27,16 +27,23 @@ export default function Customers() {
   }
   useEffect(() => { load() }, [])
 
-  // customer_id -> { count, quoted, won, list }
+  // customer_id -> aggregated quote stats
   const stats = useMemo(() => {
     const m = {}
     for (const qt of quotes) {
       if (!qt.customer_id) continue
-      const s = (m[qt.customer_id] ||= { count: 0, quoted: 0, won: 0, list: [] })
+      const s = (m[qt.customer_id] ||= { count: 0, quoted: 0, won: 0, wonCount: 0, lostCount: 0, list: [] })
       s.count++
       s.quoted += Number(qt.total) || 0
-      if (qt.status === 'won') s.won += Number(qt.total) || 0
+      if (qt.status === 'won') { s.won += Number(qt.total) || 0; s.wonCount++ }
+      if (qt.status === 'lost') s.lostCount++
       s.list.push(qt)
+    }
+    // win/loss % among decided (won + lost)
+    for (const s of Object.values(m)) {
+      const decided = s.wonCount + s.lostCount
+      s.winPct = decided ? Math.round((s.wonCount / decided) * 100) : null
+      s.lossPct = decided ? 100 - s.winPct : null
     }
     return m
   }, [quotes])
@@ -93,7 +100,7 @@ export default function Customers() {
           <div className="card divide-y">
             {filtered.length === 0 && <div className="p-4 text-sm text-slate-400">No customers yet.</div>}
             {filtered.map((c) => {
-              const s = stats[c.id] || { count: 0, quoted: 0, won: 0 }
+              const s = stats[c.id] || { count: 0, quoted: 0, won: 0, wonCount: 0, lostCount: 0, winPct: null, lossPct: null }
               return (
                 <div key={c.id} className="p-3 flex items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -101,10 +108,15 @@ export default function Customers() {
                     <div className="text-xs text-slate-500">
                       {[c.contact_person, c.email, c.phone].filter(Boolean).join(' · ') || '—'}
                     </div>
-                    <div className="text-xs mt-1 flex gap-3">
+                    <div className="text-xs mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
                       <span className="text-slate-500">{s.count} quote{s.count === 1 ? '' : 's'}</span>
-                      <span className="text-slate-500">Quoted: <b>{RM(s.quoted)}</b></span>
-                      <span className="text-green-700">Won: <b>{RM(s.won)}</b></span>
+                      <span className="text-slate-500">Quoted <b>{RM(s.quoted)}</b></span>
+                      <span className="text-slate-500">Won value <b>{RM(s.won)}</b></span>
+                    </div>
+                    <div className="text-xs mt-0.5 flex flex-wrap gap-x-3">
+                      <span className="text-green-700">Won {s.wonCount}{s.winPct !== null ? ` · ${s.winPct}% win` : ''}</span>
+                      <span className="text-red-600">Lost {s.lostCount}{s.lossPct !== null ? ` · ${s.lossPct}% loss` : ''}</span>
+                      {s.winPct === null && <span className="text-slate-400">(no decided quotes)</span>}
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-1 text-xs whitespace-nowrap">
