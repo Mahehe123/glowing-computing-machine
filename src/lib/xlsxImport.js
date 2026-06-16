@@ -1,4 +1,3 @@
-import * as XLSX from 'xlsx'
 import { SERIES_CATEGORY } from './categories'
 
 // Mirrors scripts/generate_products_sql.py — maps an equipment Excel (same headers)
@@ -56,6 +55,7 @@ function pick(get, aliases) {
 }
 
 export async function parseCompetitorsWorkbook(file) {
+  const XLSX = await import('xlsx')
   const buf = await file.arrayBuffer()
   const wb = XLSX.read(buf, { type: 'array' })
   const sheet = wb.Sheets[wb.SheetNames[0]]
@@ -88,6 +88,7 @@ export async function parseCompetitorsWorkbook(file) {
 }
 
 export async function parseProductsWorkbook(file) {
+  const XLSX = await import('xlsx')
   const buf = await file.arrayBuffer()
   const wb = XLSX.read(buf, { type: 'array' })
   const sheet = wb.Sheets['Product'] || wb.Sheets[wb.SheetNames[0]]

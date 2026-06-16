@@ -13,18 +13,40 @@ const STATUS_COLORS = { draft: '#94a3b8', sent: '#f59e0b', won: '#16a34a', lost:
 const STACK = ['won', 'lost', 'sent', 'expired', 'draft']
 const monthFmt = (k) => k // 'YYYY-MM'
 
+function inRange(dateStr, range) {
+  if (range === 'all' || !dateStr) return true
+  const d = new Date(dateStr), now = new Date()
+  if (range === 'month') return dateStr.slice(0, 7) === now.toISOString().slice(0, 7)
+  if (range === 'quarter') return d.getFullYear() === now.getFullYear() && Math.floor(d.getMonth() / 3) === Math.floor(now.getMonth() / 3)
+  if (range === 'ytd') return d.getFullYear() === now.getFullYear()
+  if (range === '12m') { const c = new Date(); c.setMonth(c.getMonth() - 12); return d >= c }
+  return true
+}
+
 export default function Dashboard() {
-  const [quotes, setQuotes] = useState([])
+  const [allQuotes, setAllQuotes] = useState([])
+  const [profiles, setProfiles] = useState([])
+  const [range, setRange] = useState('all')
+  const [sp, setSp] = useState('')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     ;(async () => {
       await sweepExpired()
-      const { data: q } = await supabase.from('quotations').select('*, customers(company)')
-      setQuotes(q || [])
+      const [{ data: q }, { data: p }] = await Promise.all([
+        supabase.from('quotations').select('*, customers(company)'),
+        supabase.from('profiles').select('id, full_name, email'),
+      ])
+      setAllQuotes(q || [])
+      setProfiles(p || [])
       setLoading(false)
     })()
   }, [])
+
+  const quotes = useMemo(
+    () => allQuotes.filter((qt) => (!sp || qt.salesperson_id === sp) && inRange(qt.quote_date, range)),
+    [allQuotes, range, sp],
+  )
 
   const m = useMemo(() => {
     const won = quotes.filter((q) => q.status === 'won')
@@ -79,7 +101,22 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-bold">Sales Dashboard</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-xl font-bold">Sales Dashboard</h1>
+        <div className="flex gap-2">
+          <select className="input max-w-[160px] py-1.5 text-sm" value={range} onChange={(e) => setRange(e.target.value)}>
+            <option value="all">All time</option>
+            <option value="month">This month</option>
+            <option value="quarter">This quarter</option>
+            <option value="ytd">Year to date</option>
+            <option value="12m">Last 12 months</option>
+          </select>
+          <select className="input max-w-[180px] py-1.5 text-sm" value={sp} onChange={(e) => setSp(e.target.value)}>
+            <option value="">All salespeople</option>
+            {profiles.map((p) => <option key={p.id} value={p.id}>{p.full_name || p.email}</option>)}
+          </select>
+        </div>
+      </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         <Kpi label="Won revenue" value={RM(m.wonRevenue)} sub={`${m.wonCount} deals`} accent />

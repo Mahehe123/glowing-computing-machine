@@ -75,9 +75,14 @@ export default function Catalog() {
   const filtered = useMemo(
     () => rows.filter((r) =>
       (!cat || categoryOf(r) === cat) &&
-      `${r.model} ${r.series} ${r.type}`.toLowerCase().includes(q.toLowerCase())),
+      `${r.model} ${r.brand || ''} ${r.series} ${r.type}`.toLowerCase().includes(q.toLowerCase())),
     [rows, q, cat],
   )
+  const PAGE = 25
+  const [page, setPage] = useState(1)
+  useEffect(() => { setPage(1) }, [q, cat])
+  const pages = Math.max(1, Math.ceil(filtered.length / PAGE))
+  const paged = filtered.slice((page - 1) * PAGE, page * PAGE)
 
   const margin = (r) => {
     const p = Number(valueOf(r, 'price_rm')) || 0
@@ -127,7 +132,7 @@ export default function Catalog() {
             </tr>
           </thead>
           <tbody className="divide-y">
-            {filtered.map((r) => {
+            {paged.map((r) => {
               const m = margin(r)
               const dirty = !!edits[r.id]
               return (
@@ -139,6 +144,7 @@ export default function Catalog() {
                   <td className="p-3 text-right text-slate-600">{dash(flowCfm(r))}</td>
                   <td className="p-3 text-right">
                     <MoneyInput value={valueOf(r, 'price_rm')} onChange={(v) => setVal(r.id, 'price_rm', v)} />
+                    {r.price_updated_at && <div className="text-[10px] text-slate-400 mt-0.5">{fmtDate(r.price_updated_at)}</div>}
                   </td>
                   <td className="p-3 text-right">
                     <MoneyInput value={valueOf(r, 'cost_rm')} onChange={(v) => setVal(r.id, 'cost_rm', v)} placeholder="—" />
@@ -169,6 +175,13 @@ export default function Catalog() {
           </tbody>
         </table>
       </div>
+      {pages > 1 && (
+        <div className="flex items-center justify-center gap-3 mt-3 text-sm">
+          <button className="btn-ghost py-1 px-3" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>Prev</button>
+          <span className="text-slate-500">Page {page} of {pages} · {filtered.length} products</span>
+          <button className="btn-ghost py-1 px-3" disabled={page >= pages} onClick={() => setPage((p) => p + 1)}>Next</button>
+        </div>
+      )}
       <SpecModal product={specProduct} editable={isAdmin} onSaved={load} onClose={() => setSpecProduct(null)} />
       {showImport && (
         <ImportModal existing={rows} onClose={() => setShowImport(false)} onDone={load} />

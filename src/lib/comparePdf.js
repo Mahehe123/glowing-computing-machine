@@ -1,5 +1,3 @@
-import jsPDF from 'jspdf'
-import autoTable from 'jspdf-autotable'
 import { RM, num } from './format'
 import { ser, gradeClasses } from './compare'
 
@@ -9,8 +7,9 @@ const GRADE_RGB = {
   poor: [253, 229, 217], worst: [248, 215, 218], '': null,
 }
 
-export function generateComparePDF({ analysis, profile }) {
+export async function generateComparePDF({ analysis, profile }) {
   const { rows, x, winner, payback } = analysis
+  const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([import('jspdf'), import('jspdf-autotable')])
   const doc = new jsPDF({ unit: 'pt', format: 'a4' })
   const W = doc.internal.pageSize.getWidth()
   const M = 40

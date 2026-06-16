@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
-import { RM, num } from '../lib/format'
+import { RM, num, fmtDate } from '../lib/format'
 import { lineNet, quoteTotals, sellingUnit } from '../lib/pricing'
 import { STATUSES } from '../lib/status'
 import { categoryOf, sortCategories } from '../lib/categories'
@@ -180,6 +180,12 @@ export default function QuotationEditor() {
 
   const downloadPDF = () => generateQuotePDF({ quote: head, items: docItems, customer, profile })
 
+  function emailDraft() {
+    const lines = docItems.map((it) => `- ${itemLabel(it)} x${it.qty}: ${RM(lineNet(it))}`).join('\n')
+    const body = `Dear ${customer?.contact_person || 'Sir/Madam'},\n\nPlease find our quotation ${head.quote_no}:\n\n${lines}\n\nTotal (MYR): ${RM(totals.total)}\nValid until: ${fmtDate(head.valid_until)}\n\n(Quotation PDF attached.)\n\nRegards,\n${profile?.full_name || ''}\n${profile?.company_name || ''}`
+    window.location.href = `mailto:${customer?.email || ''}?subject=${encodeURIComponent('Quotation ' + head.quote_no)}&body=${encodeURIComponent(body)}`
+  }
+
   return (
     <div className="grid lg:grid-cols-[1fr_380px] gap-6">
       {/* LEFT: catalog + line items */}
@@ -330,6 +336,7 @@ export default function QuotationEditor() {
           <button className="btn-primary" disabled={busy} onClick={save}>{busy ? 'Saving…' : id ? 'Update quote' : 'Save quote'}</button>
           <button className="btn-ghost" disabled={items.length === 0} onClick={() => setShowReview(true)}>Preview / Review</button>
           <button className="btn-ghost" disabled={items.length === 0} onClick={downloadPDF}>Download PDF</button>
+          <button className="btn-ghost" disabled={items.length === 0} onClick={emailDraft}>Email draft (attach PDF)</button>
         </div>
       </div>
 

@@ -1,5 +1,3 @@
-import jsPDF from 'jspdf'
-import autoTable from 'jspdf-autotable'
 import { RM, fmtDate } from './format'
 import { lineNet, sellingUnit, anchorUnit, discountPct, quoteTotals } from './pricing'
 import { categoryOf } from './categories'
@@ -10,7 +8,8 @@ const BRAND = [15, 76, 129]
 // Branded multi-page A4 quotation:
 //   Page 1  — header, customer, item summary, totals, lead time, terms.
 //   Page 2+ — one equipment specification page per line item, with clauses.
-export function generateQuotePDF({ quote, items, customer, profile }) {
+export async function generateQuotePDF({ quote, items, customer, profile }) {
+  const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([import('jspdf'), import('jspdf-autotable')])
   const doc = new jsPDF({ unit: 'pt', format: 'a4' })
   const W = doc.internal.pageSize.getWidth()
   const M = 40
