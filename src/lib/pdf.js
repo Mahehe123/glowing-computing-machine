@@ -1,7 +1,7 @@
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { RM, fmtDate } from './format'
-import { lineNet, lineUnitNet, quoteTotals } from './pricing'
+import { lineNet, sellingUnit, anchorUnit, discountPct, quoteTotals } from './pricing'
 import { categoryOf } from './categories'
 import { generalSpecRows, clausesFor, longestLead, leadText, itemLabel } from './quoteDoc'
 
@@ -74,26 +74,30 @@ export function generateQuotePDF({ quote, items, customer, profile }) {
   // ---------- ITEM SUMMARY ----------
   autoTable(doc, {
     startY: y,
-    head: [['#', 'Item', 'Qty', 'Unit (RM)', 'Amount (RM)']],
+    head: [['#', 'Item', 'Qty', 'List (RM)', 'Disc', 'Unit (RM)', 'Amount (RM)']],
     body: items.map((it, i) => [
       i + 1,
       `${itemLabel(it)}${!it.is_custom && it.description ? `\n${it.description}` : ''}`,
       it.qty,
-      RM(lineUnitNet(it)),
+      !it.is_custom && discountPct(it) > 0 ? RM(anchorUnit(it)) : '',
+      !it.is_custom && discountPct(it) > 0 ? `-${discountPct(it)}%` : '',
+      RM(sellingUnit(it)),
       RM(lineNet(it)),
     ]),
     margin: { left: M, right: M },
-    styles: { fontSize: 9, cellPadding: 5 },
+    styles: { fontSize: 8.5, cellPadding: 4 },
     headStyles: { fillColor: BRAND, halign: 'left' },
     columnStyles: {
-      0: { cellWidth: 22, halign: 'center' },
-      2: { cellWidth: 36, halign: 'center' },
-      3: { halign: 'right' }, 4: { halign: 'right' },
+      0: { cellWidth: 18, halign: 'center' },
+      2: { cellWidth: 30, halign: 'center' },
+      3: { halign: 'right', textColor: [150, 150, 150] },
+      4: { cellWidth: 38, halign: 'center', textColor: [10, 124, 74] },
+      5: { halign: 'right' }, 6: { halign: 'right', fontStyle: 'bold' },
     },
   })
 
   // ---------- TOTALS ----------
-  const t = quoteTotals(items, 0, quote.tax_pct)
+  const t = quoteTotals(items, quote.tax_pct)
   let ty = doc.lastAutoTable.finalY + 14
   const rows = [
     ['Subtotal', RM(t.subtotal)],

@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { RM, num } from '../lib/format'
-import { lineNet, quoteTotals } from '../lib/pricing'
+import { lineNet, quoteTotals, sellingUnit } from '../lib/pricing'
 import { STATUSES } from '../lib/status'
 import { categoryOf, sortCategories } from '../lib/categories'
 import { longestLead, leadText, itemLabel } from '../lib/quoteDoc'
@@ -75,8 +75,8 @@ export default function QuotationEditor() {
       setItems((its || []).map((it) => ({
         product_id: it.product_id, model: it.model, description: it.description,
         is_custom: it.is_custom || false, title: it.title || '',
-        unit_price: Number(it.unit_price), unit_cost: Number(it.unit_cost) || 0, qty: Number(it.qty),
-        adjust_type: it.adjust_type || 'discount', adjust_pct: Number(it.adjust_pct) || 0,
+        unit_price: Number(it.unit_price) || 0, unit_cost: Number(it.unit_cost) || 0,
+        markup_pct: Number(it.markup_pct) || 0, qty: Number(it.qty),
       })))
     })()
   }, [id])
@@ -94,20 +94,20 @@ export default function QuotationEditor() {
   const catOpts = useMemo(() => sortCategories([...new Set(products.map(categoryOf))]), [products])
 
   function addProduct(p) {
+    if (!p.cost_rm) { alert(`Set a cost for ${p.model} in the Catalog before adding it to a quote.`); return }
     setItems((prev) => {
       const i = prev.findIndex((it) => it.product_id === p.id)
       if (i >= 0) { const c = [...prev]; c[i] = { ...c[i], qty: c[i].qty + 1 }; return c }
       return [...prev, {
         product_id: p.id, model: p.model, description: p.type, is_custom: false, title: '',
-        unit_price: Number(p.price_rm) || 0, unit_cost: Number(p.cost_rm) || 0,
-        qty: 1, adjust_type: 'discount', adjust_pct: 0,
+        unit_cost: Number(p.cost_rm) || 0, markup_pct: 0, qty: 1,
       }]
     })
   }
   function addCustom() {
     setItems((prev) => [...prev, {
       product_id: null, model: null, is_custom: true, title: '', description: '',
-      unit_price: 0, unit_cost: 0, qty: 1, adjust_type: 'discount', adjust_pct: 0,
+      unit_price: 0, unit_cost: 0, markup_pct: 0, qty: 1,
     }])
   }
   const updateItem = (i, patch) => setItems((p) => p.map((it, idx) => (idx === i ? { ...it, ...patch } : it)))
@@ -119,9 +119,9 @@ export default function QuotationEditor() {
     [items],
   )
 
-  const totals = useMemo(() => quoteTotals(items, 0, head.tax_pct), [items, head.tax_pct])
-  const totalCost = useMemo(() => items.reduce((s, it) => s + (Number(it.unit_cost) || 0) * (Number(it.qty) || 0), 0), [items])
-  const marginPct = totals.subtotal > 0 ? ((totals.subtotal - totalCost) / totals.subtotal) * 100 : null
+  const totals = useMemo(() => quoteTotals(items, head.tax_pct), [items, head.tax_pct])
+  const totalCost = totals.cost
+  const marginPct = totals.subtotal > 0 ? ((totals.subtotal - totals.cost) / totals.subtotal) * 100 : null
   const customer = customers.find((c) => c.id === head.customer_id)
 
   const productById = useMemo(() => Object.fromEntries(products.map((p) => [p.id, p])), [products])
@@ -166,9 +166,8 @@ export default function QuotationEditor() {
     const rows = ordered.map(({ it }, idx) => ({
       quotation_id: quoteId, product_id: it.product_id, model: it.model,
       is_custom: !!it.is_custom, title: it.title || null, description: it.description,
-      unit_price: it.unit_price, unit_cost: Number(it.unit_cost) || 0, qty: it.qty,
-      adjust_type: it.adjust_type, adjust_pct: Number(it.adjust_pct) || 0,
-      line_total: lineNet(it), position: idx,
+      unit_price: sellingUnit(it), unit_cost: Number(it.unit_cost) || 0, markup_pct: Number(it.markup_pct) || 0,
+      qty: it.qty, line_total: lineNet(it), position: idx,
     }))
     const { error: ie } = await supabase.from('quotation_items').insert(rows)
     setBusy(false)
@@ -196,7 +195,7 @@ export default function QuotationEditor() {
               <div key={p.id} className="p-2.5 hover:bg-brand-light flex items-center justify-between gap-2">
                 <button onClick={() => addProduct(p)} className="text-left min-w-0 flex-1">
                   <div className="text-sm font-medium truncate">{p.model} <span className="badge bg-brand-light text-brand ml-1">{categoryOf(p)}</span></div>
-                  <div className="text-xs text-slate-500 truncate">{p.type}{p.kw ? ` · ${p.kw}kW/${p.hp}hp` : ''}{p.cfm_max ? ` · ${num(p.cfm_max)} CFM` : ''}{p.lead_time_weeks ? ` · Lead: ${p.lead_time_weeks} wks` : ''}</div>
+                  <div className="text-xs text-slate-500 truncate">{p.type}{p.kw ? ` · ${p.kw}kW/${p.hp}hp` : ''}{p.cfm_max ? ` · ${num(p.cfm_max)} CFM` : ''}{p.lead_time_weeks ? ` · Lead: ${p.lead_time_weeks} wks` : ''}{!p.cost_rm ? ' · ⚠ no cost' : ''}</div>
                 </button>
                 <button onClick={() => setSpecProduct(p)} className="text-xs text-slate-400 hover:text-brand px-1" title="View specs">ⓘ</button>
                 <div className="text-sm font-semibold text-brand whitespace-nowrap">{p.price_rm ? RM(p.price_rm) : 'TBD'}</div>
@@ -216,6 +215,14 @@ export default function QuotationEditor() {
             <p className="text-sm text-slate-400">Click products above, or add a custom line (e.g. M&amp;E / civil works).</p>
           ) : (
             <div className="space-y-3">
+              <div className="grid grid-cols-12 gap-2 text-[11px] font-semibold text-slate-500 px-1">
+                <div className="col-span-4">Equipment</div>
+                <div className="col-span-1">Qty</div>
+                <div className="col-span-2">Cost (RM)</div>
+                <div className="col-span-2">Markup %</div>
+                <div className="col-span-1 text-right">Unit</div>
+                <div className="col-span-2 text-right">Sub Total</div>
+              </div>
               {ordered.map(({ it, idx }) => (
                 it.is_custom ? (
                   <div key={idx} className="border border-amber-200 bg-amber-50/40 rounded-md p-2 space-y-2">
@@ -238,14 +245,9 @@ export default function QuotationEditor() {
                       <div className="text-[11px] text-slate-400 mt-0.5">{it.model}</div>
                     </div>
                     <input type="number" min="1" className="input py-1 col-span-1" value={it.qty} onChange={(e) => updateItem(idx, { qty: Number(e.target.value) })} />
-                    <input type="number" className="input py-1 col-span-2" value={it.unit_price} onChange={(e) => updateItem(idx, { unit_price: Number(e.target.value) })} />
-                    <div className="col-span-3 flex gap-1">
-                      <select className="input py-1 w-24" value={it.adjust_type} onChange={(e) => updateItem(idx, { adjust_type: e.target.value })}>
-                        <option value="discount">Disc %</option>
-                        <option value="markup">Markup %</option>
-                      </select>
-                      <input type="number" className="input py-1" value={it.adjust_pct} onChange={(e) => updateItem(idx, { adjust_pct: Number(e.target.value) })} />
-                    </div>
+                    <input type="number" className="input py-1 col-span-2" value={it.unit_cost} onChange={(e) => updateItem(idx, { unit_cost: Number(e.target.value) })} />
+                    <input type="number" className="input py-1 col-span-2" value={it.markup_pct} onChange={(e) => updateItem(idx, { markup_pct: Number(e.target.value) })} />
+                    <div className="col-span-1 text-right text-xs text-slate-600">{RM(sellingUnit(it))}</div>
                     <div className="col-span-2 text-right text-sm font-medium flex items-center justify-end gap-2">
                       {RM(lineNet(it))}
                       <button onClick={() => removeItem(idx)} className="text-red-500 hover:text-red-700">✕</button>

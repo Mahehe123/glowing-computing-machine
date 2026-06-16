@@ -1,11 +1,11 @@
 import { RM, fmtDate } from '../lib/format'
-import { lineNet, lineUnitNet, quoteTotals } from '../lib/pricing'
+import { lineNet, sellingUnit, anchorUnit, discountPct, quoteTotals } from '../lib/pricing'
 import { categoryOf } from '../lib/categories'
 import { generalSpecRows, clausesFor, longestLead, leadText, itemLabel } from '../lib/quoteDoc'
 
 // On-screen review of the quotation, laid out like the PDF (page 1 + spec pages).
 export default function QuoteReview({ quote, items, customer, profile, onClose, onDownload }) {
-  const t = quoteTotals(items, 0, quote.tax_pct)
+  const t = quoteTotals(items, quote.tax_pct)
   const lead = longestLead(items)
   const backItems = items.filter((it) => it.product || (it.is_custom && it.description))
 
@@ -77,7 +77,14 @@ export default function QuoteReview({ quote, items, customer, profile, onClose, 
                     {!it.is_custom && it.description && <div className="text-xs text-slate-500">{it.description}</div>}
                   </td>
                   <td className="p-2 text-center">{it.qty}</td>
-                  <td className="p-2 text-right">{RM(lineUnitNet(it))}</td>
+                  <td className="p-2 text-right">
+                    {!it.is_custom && discountPct(it) > 0 ? (
+                      <>
+                        <div className="text-xs text-slate-400 line-through">{RM(anchorUnit(it))}</div>
+                        <div>{RM(sellingUnit(it))} <span className="text-green-600 text-[10px]">−{discountPct(it)}%</span></div>
+                      </>
+                    ) : RM(sellingUnit(it))}
+                  </td>
                   <td className="p-2 text-right">{RM(lineNet(it))}</td>
                 </tr>
               ))}
