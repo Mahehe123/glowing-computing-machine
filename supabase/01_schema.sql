@@ -154,24 +154,36 @@ alter table public.quotations      enable row level security;
 alter table public.quotation_items enable row level security;
 
 -- PROFILES: everyone signed in can read (so quotes show author);
--- you can only write your own.
+-- you can only write your own.  (drop-if-exists keeps this re-runnable;
+-- 04_access_control.sql later replaces these with the role-aware versions.)
+drop policy if exists "profiles read"   on public.profiles;
+drop policy if exists "profiles upsert" on public.profiles;
+drop policy if exists "profiles update" on public.profiles;
 create policy "profiles read"   on public.profiles for select to authenticated using (true);
 create policy "profiles upsert" on public.profiles for insert to authenticated with check (auth.uid() = id);
 create policy "profiles update" on public.profiles for update to authenticated using (auth.uid() = id);
 
 -- PRODUCTS: shared catalog, any signed-in team member can read & manage.
+drop policy if exists "products all" on public.products;
 create policy "products all" on public.products for all to authenticated using (true) with check (true);
 
 -- CUSTOMERS: shared across the team.
+drop policy if exists "customers all" on public.customers;
 create policy "customers all" on public.customers for all to authenticated using (true) with check (true);
 
 -- QUOTATIONS: whole team can read (for the dashboard); you modify your own.
+drop policy if exists "quotes read"   on public.quotations;
+drop policy if exists "quotes insert" on public.quotations;
+drop policy if exists "quotes update" on public.quotations;
+drop policy if exists "quotes delete" on public.quotations;
 create policy "quotes read"   on public.quotations for select to authenticated using (true);
 create policy "quotes insert" on public.quotations for insert to authenticated with check (auth.uid() = salesperson_id);
 create policy "quotes update" on public.quotations for update to authenticated using (auth.uid() = salesperson_id);
 create policy "quotes delete" on public.quotations for delete to authenticated using (auth.uid() = salesperson_id);
 
 -- QUOTATION ITEMS: readable by team; writable only on quotes you own.
+drop policy if exists "qitems read"  on public.quotation_items;
+drop policy if exists "qitems write" on public.quotation_items;
 create policy "qitems read" on public.quotation_items for select to authenticated using (true);
 create policy "qitems write" on public.quotation_items for all to authenticated
   using (exists (select 1 from public.quotations q where q.id = quotation_id and q.salesperson_id = auth.uid()))
