@@ -44,6 +44,7 @@ create trigger protect_profile_privileges
 -- profiles: read your own (always, so the app can see your status) or any if admin.
 drop policy if exists "profiles read"   on public.profiles;
 drop policy if exists "profiles upsert" on public.profiles;
+drop policy if exists "profiles insert" on public.profiles;
 drop policy if exists "profiles update" on public.profiles;
 create policy "profiles read"   on public.profiles for select to authenticated using (id = auth.uid() or public.is_admin());
 create policy "profiles insert" on public.profiles for insert to authenticated with check (id = auth.uid());
