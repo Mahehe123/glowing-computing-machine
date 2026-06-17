@@ -1,7 +1,7 @@
 import { RM, fmtDate } from './format'
 import { lineNet, sellingUnit, anchorUnit, discountPct, quoteTotals } from './pricing'
 import { categoryOf } from './categories'
-import { generalSpecRows, detailSpecEntries, clausesFor, longestLead, leadText, itemLabel } from './quoteDoc'
+import { equipmentSpecRows, leadPill, clausesFor, longestLead, leadText, itemLabel } from './quoteDoc'
 
 const BRAND = [15, 76, 129]
 
@@ -74,15 +74,18 @@ export async function generateQuotePDF({ quote, items, customer, profile }) {
   autoTable(doc, {
     startY: y,
     head: [['#', 'Item', 'Qty', 'List (RM)', 'Disc', 'Unit (RM)', 'Amount (RM)']],
-    body: items.map((it, i) => [
+    body: items.map((it, i) => {
+      const sub = !it.is_custom && it.product ? [categoryOf(it.product), it.product.type].filter(Boolean).join(' · ') : ''
+      return [
       i + 1,
-      `${itemLabel(it)}${!it.is_custom && it.description ? `\n${it.description}` : ''}`,
+      `${itemLabel(it)}${sub ? `\n${sub}` : ''}`,
       it.qty,
       !it.is_custom && discountPct(it) > 0 ? RM(anchorUnit(it)) : '',
       !it.is_custom && discountPct(it) > 0 ? `-${discountPct(it)}%` : '',
       RM(sellingUnit(it)),
       RM(lineNet(it)),
-    ]),
+    ]
+    }),
     margin: { left: M, right: M },
     styles: { fontSize: 8.5, cellPadding: 4 },
     headStyles: { fillColor: BRAND, halign: 'left' },
@@ -126,16 +129,8 @@ export async function generateQuotePDF({ quote, items, customer, profile }) {
     ty += 34
   }
 
-  // ---------- TERMS + SIGNATURE ----------
-  if (quote.terms) {
-    doc.setFontSize(8).setFont('helvetica', 'bold')
-    doc.text('Terms & Conditions', M, ty)
-    doc.setFont('helvetica', 'normal')
-    const split = doc.splitTextToSize(quote.terms, W - M * 2)
-    doc.text(split, M, ty + 12)
-    ty += 12 + split.length * 10
-  }
-  doc.setFontSize(9)
+  // ---------- SIGNATURE (terms moved to a dedicated final page) ----------
+  doc.setFontSize(9).setFont('helvetica', 'normal')
   doc.text(profile?.signature || 'Prepared by', M, ty + 28)
   doc.setFont('helvetica', 'bold').text(profile?.full_name || '', M, ty + 44)
 
@@ -147,14 +142,30 @@ export async function generateQuotePDF({ quote, items, customer, profile }) {
       doc.setFontSize(8).setFont('helvetica', 'normal').setTextColor(120)
       doc.text('EQUIPMENT SPECIFICATION', M, 48)
       doc.setTextColor(30).setFontSize(16).setFont('helvetica', 'bold')
-      doc.text(it.model || '', M, 66)
+      const brand = it.product.brand || profile?.company_name || ''
+      doc.text(`${brand} / ${it.model || ''}`, M, 66)
       doc.setFontSize(9).setFont('helvetica', 'normal').setTextColor(90)
       doc.text(`${categoryOf(it.product)}  ·  ${it.product.type || ''}`, M, 80)
+
+      // Lead-time pill, top-right.
+      const lp = leadPill(it.product)
+      if (lp) {
+        const label = `Lead time: ${lp}`
+        doc.setFontSize(8.5).setFont('helvetica', 'bold')
+        const tw = doc.getTextWidth(label)
+        const padX = 8, ph = 17, py = 52
+        const px = W - M - tw - padX * 2
+        doc.setFillColor(225, 235, 245)
+        doc.roundedRect(px, py, tw + padX * 2, ph, 8, 8, 'F')
+        doc.setTextColor(...BRAND)
+        doc.text(label, px + padX, py + 11.5)
+        doc.setFont('helvetica', 'normal')
+      }
+
       doc.setDrawColor(...BRAND).setLineWidth(1.5).line(M, 88, W - M, 88)
       doc.setTextColor(30)
 
-      const specRows = [...generalSpecRows(it.product), ...detailSpecEntries(it.product)]
-        .map(([k, v]) => [k, String(v)])
+      const specRows = equipmentSpecRows(it.product).map(([k, v]) => [k, String(v)])
 
       autoTable(doc, {
         startY: 100,
@@ -180,6 +191,22 @@ export async function generateQuotePDF({ quote, items, customer, profile }) {
       doc.text(doc.splitTextToSize(it.description || '', W - M * 2), M, 92)
     }
   })
+
+  // ---------- TERMS & CONDITIONS: dedicated final page ----------
+  if (quote.terms) {
+    doc.addPage()
+    doc.setFontSize(8).setFont('helvetica', 'normal').setTextColor(120)
+    doc.text('TERMS & CONDITIONS', M, 48)
+    doc.setDrawColor(...BRAND).setLineWidth(1.5).line(M, 56, W - M, 56)
+    doc.setTextColor(40).setFontSize(9).setFont('helvetica', 'normal')
+    const pageH = doc.internal.pageSize.getHeight()
+    let ty2 = 74
+    doc.splitTextToSize(quote.terms, W - M * 2).forEach((line) => {
+      if (ty2 > pageH - M) { doc.addPage(); ty2 = M + 20 }
+      doc.text(line, M, ty2); ty2 += 12
+    })
+    doc.setTextColor(30)
+  }
 
   // ---------- FOOTER: page numbers on every page ----------
   const H = doc.internal.pageSize.getHeight()

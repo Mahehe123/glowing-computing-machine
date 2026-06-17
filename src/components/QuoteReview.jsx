@@ -1,12 +1,13 @@
 import { RM, fmtDate } from '../lib/format'
 import { lineNet, sellingUnit, anchorUnit, discountPct, quoteTotals } from '../lib/pricing'
 import { categoryOf } from '../lib/categories'
-import { generalSpecRows, detailSpecEntries, clausesFor, longestLead, leadText, itemLabel } from '../lib/quoteDoc'
+import { equipmentSpecRows, leadPill, clausesFor, longestLead, leadText, itemLabel } from '../lib/quoteDoc'
 
 // On-screen review of the quotation, laid out like the PDF (page 1 + spec pages).
 export default function QuoteReview({ quote, items, customer, profile, onClose, onDownload }) {
   const t = quoteTotals(items, quote.tax_pct)
   const lead = longestLead(items)
+  const company = profile?.company_name || 'Our brand'
   const backItems = items.filter((it) => it.product || (it.is_custom && it.description))
 
   return (
@@ -74,7 +75,9 @@ export default function QuoteReview({ quote, items, customer, profile, onClose, 
                   <td className="p-2">{i + 1}</td>
                   <td className="p-2">
                     <div className="font-medium">{itemLabel(it)}</div>
-                    {!it.is_custom && it.description && <div className="text-xs text-slate-500">{it.description}</div>}
+                    {!it.is_custom && it.product && (
+                      <div className="text-xs text-slate-500">{[categoryOf(it.product), it.product.type].filter(Boolean).join(' · ')}</div>
+                    )}
                   </td>
                   <td className="p-2 text-center">{it.qty}</td>
                   <td className="p-2 text-right">
@@ -107,13 +110,6 @@ export default function QuoteReview({ quote, items, customer, profile, onClose, 
             </div>
           )}
 
-          {quote.terms && (
-            <div className="mt-4 text-xs text-slate-600">
-              <div className="font-semibold text-slate-500">Terms &amp; Conditions</div>
-              <div className="whitespace-pre-line">{quote.terms}</div>
-            </div>
-          )}
-
           <div className="mt-8 text-sm">
             <div className="text-slate-500">{profile?.signature || 'Prepared by'}</div>
             <div className="font-medium mt-4 border-t border-slate-300 inline-block pt-1">{profile?.full_name || ''}</div>
@@ -123,15 +119,20 @@ export default function QuoteReview({ quote, items, customer, profile, onClose, 
         {/* BACK PAGES — one per equipment (spec) or custom line (description) */}
         {backItems.map((it, i) => it.product ? (
           <Sheet key={i}>
-            <div className="border-b-2 border-brand pb-2 mb-3">
-              <div className="text-xs text-slate-400">EQUIPMENT SPECIFICATION</div>
-              <div className="text-lg font-bold">{it.model}</div>
-              <span className="badge bg-brand-light text-brand">{categoryOf(it.product)}</span>
-              <span className="text-sm text-slate-500 ml-2">{it.product.type}</span>
+            <div className="border-b-2 border-brand pb-2 mb-3 flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-xs text-slate-400">EQUIPMENT SPECIFICATION</div>
+                <div className="text-lg font-bold">{(it.product.brand || company)} / {it.model}</div>
+                <span className="badge bg-brand-light text-brand">{categoryOf(it.product)}</span>
+                <span className="text-sm text-slate-500 ml-2">{it.product.type}</span>
+              </div>
+              {leadPill(it.product) && (
+                <span className="badge bg-brand-light text-brand whitespace-nowrap shrink-0">Lead time: {leadPill(it.product)}</span>
+              )}
             </div>
             <table className="w-full text-sm">
               <tbody>
-                {[...generalSpecRows(it.product), ...detailSpecEntries(it.product)].map(([k, v], idx) => (
+                {equipmentSpecRows(it.product).map(([k, v], idx) => (
                   <tr key={idx} className="border-b">
                     <td className="py-1.5 text-slate-500 w-1/2">{k}</td>
                     <td className="py-1.5 font-medium">{String(v)}</td>
@@ -152,6 +153,16 @@ export default function QuoteReview({ quote, items, customer, profile, onClose, 
             <div className="text-sm whitespace-pre-line text-slate-700">{it.description}</div>
           </Sheet>
         ))}
+
+        {/* TERMS & CONDITIONS — dedicated final page */}
+        {quote.terms && (
+          <Sheet>
+            <div className="border-b-2 border-brand pb-2 mb-3">
+              <div className="text-xs text-slate-400">TERMS &amp; CONDITIONS</div>
+            </div>
+            <div className="text-sm whitespace-pre-line text-slate-700">{quote.terms}</div>
+          </Sheet>
+        )}
       </div>
     </div>
   )

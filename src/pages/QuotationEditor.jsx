@@ -207,7 +207,7 @@ export default function QuotationEditor() {
               <div key={p.id} className="p-2.5 hover:bg-brand-light flex items-center justify-between gap-2">
                 <button onClick={() => addProduct(p)} className="text-left min-w-0 flex-1">
                   <div className="text-sm font-medium truncate">
-                    {p.model}
+                    {(p.brand || company)} {p.model}
                     <span className="badge bg-brand-light text-brand ml-1">{categoryOf(p)}</span>
                     {p.specs?.['Technology'] && <span className="badge bg-slate-100 text-slate-600 ml-1">{p.specs['Technology']}</span>}
                   </div>

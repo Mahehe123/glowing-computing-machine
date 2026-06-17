@@ -80,3 +80,80 @@ export function generalSpecRows(product) {
 export function detailSpecEntries(product) {
   return Object.entries(product?.specs || {}).filter(([k]) => !FLOW_SPEC_KEYS.has(k))
 }
+
+// Lead-time text for the spec-page header pill (e.g. "6 - 8 weeks").
+export const leadPill = (product) =>
+  product ? leadText(product.lead_time_weeks) : null
+
+// Ordered specification rows for the quotation technical page, curated per equipment
+// family so each spec sheet reads in a consistent, sensible order. Empty fields drop out.
+export function equipmentSpecRows(product) {
+  if (!product) return []
+  const p = product
+  const s = p.specs || {}
+  const power = p.kw ? `${p.kw} kW / ${p.hp} hp` : null
+  const flow = flowRows(p) // [ [cfmLabel, cfm], [m3Label, m3] ] (handles inverter ranges)
+
+  let rows
+  switch (categoryOf(p)) {
+    case 'Air compressor':
+      rows = [
+        ['Model', p.model],
+        ['Technology', s['Technology']],
+        ['Starter Type', s['Starter Type']],
+        ['Power', power],
+        ['Cooling', p.wc_ac],
+        ['Loading Pressure, bar', s['Loading Pressure']],
+        ['Unloading Pressure, bar', s['Unload Pressure']],
+        ...flow,
+        ['Motor Type', s['Motor Type']],
+        ['IE Rating', s['IE Rating']],
+        ['Power Supply', s['Power Supply']],
+        ['Dimension', s['Dimension']],
+        ['Weight, KG', s['Weight']],
+        ['Outlet Size', s['Outlet size']],
+        ['Outlet Air Temperature, °C', s['Outlet air temperature']],
+      ]
+      break
+    case 'Dryer':
+      rows = [
+        ['Model', p.model],
+        ['Power', power],
+        ['Cooling', p.wc_ac],
+        ['Max Working Pressure, bar', s['Max working pressure']],
+        ...flow,
+        ['Power Supply', s['Power Supply']],
+        ['Noise Level, dB', s['Noise level']],
+        ['Dimension', s['Dimension']],
+        ['Weight, KG', s['Weight']],
+        ['Outlet Size', s['Outlet size']],
+      ]
+      break
+    case 'Filter':
+      rows = [
+        ['Model', p.model],
+        ['Flow Capacity, CFM', s['filter, cfm']],
+        ['Flow Capacity, m³/min', s['Filter, m3/min']],
+        ['Particle Removal, micron', s['Particle removal']],
+        ['Oil Carry Over, ppm', s['filter oil carry over']],
+        ['Dimension', s['Dimension']],
+        ['Weight, KG', s['Weight']],
+        ['Outlet Size', s['Outlet size']],
+      ]
+      break
+    case 'Air receiver tank':
+      rows = [
+        ['Model', p.model],
+        ['Volume, L', s['tank volume']],
+        ['Working Pressure, bar', s['tank pressure']],
+        ['Material', s['Air tank Material']],
+        ['Dimension', s['Dimension']],
+        ['Weight, KG', s['Weight']],
+        ['Outlet Size', s['Outlet size']],
+      ]
+      break
+    default:
+      rows = [['Model', p.model], ['Power', power], ...flow, ...Object.entries(s)]
+  }
+  return rows.filter(([, v]) => v != null && v !== '')
+}
