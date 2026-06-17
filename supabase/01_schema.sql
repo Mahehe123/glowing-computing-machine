@@ -16,6 +16,7 @@ create table if not exists public.profiles (
   logo_url      text,
   default_terms text,
   signature     text,
+  sales_target  numeric,                           -- annual sales target (RM); admin-set, see 10_sales_targets.sql
   updated_at    timestamptz default now()
 );
 

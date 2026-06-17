@@ -12,6 +12,7 @@ export default function Users() {
   const toast = useToast()
   const [rows, setRows] = useState([])
   const [busy, setBusy] = useState(null)
+  const [targets, setTargets] = useState({}) // id -> edited annual target (string)
   const [backupBusy, setBackupBusy] = useState(false)
   const [backupMsg, setBackupMsg] = useState(null)
 
@@ -43,6 +44,20 @@ export default function Users() {
     load()
   }
 
+  const targetVal = (r) => (targets[r.id] !== undefined ? targets[r.id] : (r.sales_target ?? ''))
+  async function saveTarget(r) {
+    if (targets[r.id] === undefined) return
+    const n = targets[r.id] === '' ? null : Number(targets[r.id])
+    const clearEdit = () => setTargets((s) => { const c = { ...s }; delete c[r.id]; return c })
+    if ((n ?? null) === (r.sales_target ?? null)) return clearEdit()
+    setBusy(r.id)
+    const { error } = await supabase.from('profiles').update({ sales_target: n }).eq('id', r.id)
+    setBusy(null)
+    if (error) return toast(error.message, 'error')
+    toast('Target saved.', 'success')
+    clearEdit(); load()
+  }
+
   return (
     <div>
       <h1 className="text-xl font-bold mb-1">Users &amp; Access</h1>
@@ -56,6 +71,7 @@ export default function Users() {
               <th className="text-left p-3">User</th>
               <th className="text-left p-3">Role</th>
               <th className="text-left p-3">Status</th>
+              <th className="text-left p-3">Target (RM/yr)</th>
               <th className="text-left p-3">Joined</th>
               <th className="p-3"></th>
             </tr>
@@ -77,6 +93,13 @@ export default function Users() {
                       {r.active ? 'active' : 'revoked'}
                     </span>
                   </td>
+                  <td className="p-3">
+                    <input type="number" min="0" step="1000" className="input py-1 w-28" placeholder="—"
+                      value={targetVal(r)} disabled={busy === r.id}
+                      onChange={(e) => setTargets((s) => ({ ...s, [r.id]: e.target.value }))}
+                      onBlur={() => saveTarget(r)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }} />
+                  </td>
                   <td className="p-3 text-slate-500">{fmtDate(r.updated_at)}</td>
                   <td className="p-3 text-right whitespace-nowrap space-x-2">
                     {isMe ? (
@@ -97,7 +120,7 @@ export default function Users() {
                 </tr>
               )
             })}
-            {rows.length === 0 && <tr><td colSpan={5} className="p-6 text-center text-slate-400">No users.</td></tr>}
+            {rows.length === 0 && <tr><td colSpan={6} className="p-6 text-center text-slate-400">No users.</td></tr>}
           </tbody>
         </table>
       </div>

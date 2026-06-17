@@ -26,6 +26,7 @@ create table if not exists public.profiles (
   logo_url      text,
   default_terms text,
   signature     text,
+  sales_target  numeric,                           -- annual sales target (RM); admin-set, see 10_sales_targets.sql
   updated_at    timestamptz default now()
 );
 
@@ -413,3 +414,21 @@ update public.products set category = 'Air compressor'    where category in ('Oi
 update public.products set category = 'Air receiver tank'  where category = 'Air Tank';
 update public.products set category = 'Filter'             where category = 'Air filter';
 -- 'Dryer' is unchanged.
+
+-- ===== 10_sales_targets.sql =====
+
+-- ============================================================
+-- Per-user ANNUAL sales target (RM), admin-set, used by the dashboard.
+-- ============================================================
+alter table public.profiles add column if not exists sales_target numeric;
+
+create or replace function public.protect_profile_privileges() returns trigger
+  language plpgsql security definer set search_path = public as $$
+begin
+  if auth.uid() is not null and not public.is_admin() then
+    new.role := old.role;
+    new.active := old.active;
+    new.sales_target := old.sales_target;
+  end if;
+  return new;
+end $$;

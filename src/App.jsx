@@ -2,7 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
 import Layout from './components/Layout'
 import Login from './pages/Login'
-import Dashboard from './pages/Dashboard'
+import DashboardSwitch from './pages/DashboardSwitch'
 import QuotationEditor from './pages/QuotationEditor'
 import Quotations from './pages/Quotations'
 import Customers from './pages/Customers'
@@ -35,7 +35,7 @@ export default function App() {
           </Protected>
         }
       >
-        <Route path="/" element={<Dashboard />} />
+        <Route path="/" element={<DashboardSwitch />} />
         <Route path="/quotes" element={<Quotations />} />
         <Route path="/quotes/new" element={<QuotationEditor />} />
         <Route path="/quotes/:id" element={<QuotationEditor />} />
