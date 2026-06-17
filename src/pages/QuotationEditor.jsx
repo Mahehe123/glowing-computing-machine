@@ -128,6 +128,7 @@ export default function QuotationEditor() {
   const totalCost = totals.cost
   const marginPct = totals.subtotal > 0 ? ((totals.subtotal - totals.cost) / totals.subtotal) * 100 : null
   const customer = customers.find((c) => c.id === head.customer_id)
+  const company = profile?.company_name || 'Our brand'
 
   const productById = useMemo(() => Object.fromEntries(products.map((p) => [p.id, p])), [products])
   const docItems = useMemo(
@@ -205,8 +206,21 @@ export default function QuotationEditor() {
             {filtered.map((p) => (
               <div key={p.id} className="p-2.5 hover:bg-brand-light flex items-center justify-between gap-2">
                 <button onClick={() => addProduct(p)} className="text-left min-w-0 flex-1">
-                  <div className="text-sm font-medium truncate">{p.model} <span className="badge bg-brand-light text-brand ml-1">{categoryOf(p)}</span></div>
-                  <div className="text-xs text-slate-500 truncate">{p.type}{p.kw ? ` · ${p.kw}kW/${p.hp}hp` : ''}{p.cfm_max ? ` · ${num(p.cfm_max)} CFM` : ''}{p.lead_time_weeks ? ` · Lead: ${p.lead_time_weeks} wks` : ''}{!p.cost_rm ? ' · ⚠ no cost' : ''}</div>
+                  <div className="text-sm font-medium truncate">
+                    {p.model}
+                    <span className="badge bg-brand-light text-brand ml-1">{categoryOf(p)}</span>
+                    {p.specs?.['Technology'] && <span className="badge bg-slate-100 text-slate-600 ml-1">{p.specs['Technology']}</span>}
+                  </div>
+                  <div className="text-xs text-slate-500 truncate">
+                    {[
+                      p.kw ? `${num(p.kw)} kW` : null,
+                      p.hp ? `${num(p.hp)} hp` : null,
+                      p.specs?.['Loading Pressure'] ? `${num(p.specs['Loading Pressure'])} bar` : null,
+                      p.cfm_max ? `${num(p.cfm_max)} CFM` : null,
+                      p.specs?.['Max m3/min'] ? `${num(p.specs['Max m3/min'], 2)} m³/min` : null,
+                    ].filter(Boolean).join(' · ')}
+                    {!p.cost_rm ? ' · ⚠ no cost' : ''}
+                  </div>
                 </button>
                 <button onClick={() => setSpecProduct(p)} className="text-xs text-slate-400 hover:text-brand px-1" title="View specs">ⓘ</button>
                 <div className="text-sm font-semibold text-brand whitespace-nowrap">{p.price_rm ? RM(p.price_rm) : 'TBD'}</div>
@@ -227,12 +241,12 @@ export default function QuotationEditor() {
           ) : (
             <div className="space-y-3">
               <div className="grid grid-cols-12 gap-2 text-[11px] font-semibold text-slate-500 px-1">
-                <div className="col-span-4">Equipment</div>
+                <div className="col-span-3">Equipment</div>
                 <div className="col-span-1">Qty</div>
                 <div className="col-span-2">Cost (RM)</div>
                 <div className="col-span-2">Markup %</div>
-                <div className="col-span-1 text-right">Unit</div>
-                <div className="col-span-2 text-right">Sub Total</div>
+                <div className="col-span-2 text-right">Unit, RM</div>
+                <div className="col-span-2 text-right">Sub Total, RM</div>
               </div>
               {ordered.map(({ it, idx }) => (
                 it.is_custom ? (
@@ -242,7 +256,7 @@ export default function QuotationEditor() {
                       <input type="number" min="1" className="input py-1 col-span-2" value={it.qty} onChange={(e) => updateItem(idx, { qty: Number(e.target.value) })} />
                       <input type="number" className="input py-1 col-span-3" placeholder="Unit RM" value={it.unit_price} onChange={(e) => updateItem(idx, { unit_price: Number(e.target.value) })} />
                       <div className="col-span-2 text-right text-sm font-medium flex items-center justify-end gap-2">
-                        {RM(lineNet(it))}
+                        {num(lineNet(it), 2)}
                         <button onClick={() => removeItem(idx)} className="text-red-500 hover:text-red-700">✕</button>
                       </div>
                     </div>
@@ -251,16 +265,17 @@ export default function QuotationEditor() {
                   </div>
                 ) : (
                   <div key={idx} className="grid grid-cols-12 gap-2 items-center">
-                    <div className="col-span-4">
-                      <input className="input py-1 text-sm" value={it.description} onChange={(e) => updateItem(idx, { description: e.target.value })} />
-                      <div className="text-[11px] text-slate-400 mt-0.5">{it.model}</div>
+                    <div className="col-span-3 min-w-0">
+                      <div className="text-sm font-medium truncate">{(productById[it.product_id]?.brand || company)} / {it.model}</div>
                     </div>
                     <input type="number" min="1" className="input py-1 col-span-1" value={it.qty} onChange={(e) => updateItem(idx, { qty: Number(e.target.value) })} />
-                    <input type="number" className="input py-1 col-span-2" value={it.unit_cost} onChange={(e) => updateItem(idx, { unit_cost: Number(e.target.value) })} />
+                    <input type="text" inputMode="numeric" className="input py-1 col-span-2"
+                      value={it.unit_cost ? Number(it.unit_cost).toLocaleString('en-US') : ''}
+                      onChange={(e) => updateItem(idx, { unit_cost: Number(e.target.value.replace(/[^\d]/g, '')) || 0 })} />
                     <input type="number" className="input py-1 col-span-2" value={it.markup_pct} onChange={(e) => updateItem(idx, { markup_pct: Number(e.target.value) })} />
-                    <div className="col-span-1 text-right text-xs text-slate-600">{RM(sellingUnit(it))}</div>
+                    <div className="col-span-2 text-right text-xs text-slate-600">{num(sellingUnit(it), 2)}</div>
                     <div className="col-span-2 text-right text-sm font-medium flex items-center justify-end gap-2">
-                      {RM(lineNet(it))}
+                      {num(lineNet(it), 2)}
                       <button onClick={() => removeItem(idx)} className="text-red-500 hover:text-red-700">✕</button>
                     </div>
                   </div>
