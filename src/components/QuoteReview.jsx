@@ -158,7 +158,9 @@ export default function QuoteReview({ quote, items, customer, profile, onClose, 
 }
 
 function Sheet({ children }) {
-  return <div className="bg-white shadow-lg rounded w-full max-w-[210mm] min-h-[200px] p-8">{children}</div>
+  // shrink-0: the scroll container is a flex column, so without this the sheets get
+  // compressed to fit the viewport (content clipped/overlapping) instead of scrolling.
+  return <div className="bg-white shadow-lg rounded w-full max-w-[210mm] min-h-[200px] p-8 shrink-0">{children}</div>
 }
 function Meta({ label, value }) {
   return (

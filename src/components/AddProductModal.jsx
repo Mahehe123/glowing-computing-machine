@@ -6,7 +6,7 @@ import { useToast } from '../context/ToastContext'
 const STARTERS = ['Star delta', 'Inverter', 'DOL']
 const COOLING = ['Air Cooled', 'Water Cooled']
 const IE_RATINGS = ['IE2', 'IE3', 'IE4', 'IE5+']
-const POWER_SUPPLIES = ['400v/3ph/50hz', '380v/3ph/50hz', '415v/3ph/50hz']
+const POWER_SUPPLIES = ['400v/3ph/50hz', '380v/3ph/50hz', '415v/3ph/50hz', '230v/1ph/50hz']
 const MOTOR_TYPES = ['TEFC, Class F', 'TEFC, Class E']
 const EQUIPMENT = Object.keys(EQUIPMENT_TYPES)
 const TECH_BY_TYPE = { 'Oil Lubricated': ['Oil lubricated'], 'Oil-Free': ['Water lubricated', 'Dry Screw'] }
@@ -66,7 +66,7 @@ export default function AddProductModal({ defaultBrand, onClose, onDone }) {
     }
     if (isTank) { put('tank volume', num(f.tank_volume)); put('tank pressure', num(f.tank_pressure)); put('Air tank Material', f.tank_material) }
     if (showWater) { put('Input water flow', num(f.water_flow)); put('water pressure', num(f.water_pressure)) }
-    if (f.starter) put('Starter Type', f.starter)
+    if (isComp && f.starter) put('Starter Type', f.starter)
 
     const row = {
       brand: f.brand || null, model: f.model.trim(), tpl: f.tpl || null,
@@ -101,10 +101,10 @@ export default function AddProductModal({ defaultBrand, onClose, onDone }) {
           <Fld label="Part No." value={f.tpl} onChange={set('tpl')} />
           <Fld label="Cost RM" type="number" value={f.cost_rm} onChange={set('cost_rm')} />
           <Fld label="Lead (weeks)" type="number" value={f.lead_time_weeks} onChange={set('lead_time_weeks')} />
-          <Sel label="Equipment *" value={eq} onChange={(e) => setF((s) => ({ ...s, equipment: e.target.value, type: '', technology: '' }))} options={EQUIPMENT} />
+          <Sel label="Equipment *" value={eq} onChange={(e) => setF((s) => ({ ...s, equipment: e.target.value, type: '', technology: '', starter: '' }))} options={EQUIPMENT} />
           <Sel label="Type" value={f.type} onChange={(e) => setF((s) => ({ ...s, type: e.target.value, technology: '' }))} options={eq ? EQUIPMENT_TYPES[eq] : []} disabled={!eq} />
           {isComp && <Sel label="Technology" value={f.technology} onChange={set('technology')} options={techOptions} disabled={!f.type} />}
-          <Sel label="Starter type" value={f.starter} onChange={set('starter')} options={STARTERS} />
+          {isComp && <Sel label="Starter type" value={f.starter} onChange={set('starter')} options={STARTERS} />}
         </Section>
 
         {powered && (

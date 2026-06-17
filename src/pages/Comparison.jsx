@@ -5,6 +5,7 @@ import {
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { RM, num } from '../lib/format'
+import { isCompressor } from '../lib/categories'
 import {
   productToUnit, competitorToUnit, analyze, gradeClasses, DEFAULT_INPUTS,
   tcoOverTime, capexEnergySplit, savingsOverTime, annualEnergy, annualCO2,
@@ -42,8 +43,9 @@ export default function Comparison() {
   }
   useEffect(() => { load() }, [])
 
+  // The TCO/energy model is compressor-specific, so only air compressors are comparable.
   const units = useMemo(() => [
-    ...products.map((p) => productToUnit(p, company)),
+    ...products.filter(isCompressor).map((p) => productToUnit(p, company)),
     ...competitors.map(competitorToUnit),
   ], [products, competitors, company])
 
