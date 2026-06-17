@@ -38,6 +38,30 @@ export function longestLead(items) {
   return best && best.weeks ? best : null
 }
 
+const CFM_TO_M3 = 0.0283168
+// Flow figures are surfaced by generalSpecRows, so they must not repeat in the detail spec list.
+const FLOW_SPEC_KEYS = new Set(['Min m3/min', 'Max m3/min'])
+const round2 = (n) => Math.round(n * 100) / 100
+
+// Flow capacity rows. Inverter compressors carry a cfm_min and read as a min–max range
+// (CFM and m³/min); fixed-speed units show a single figure.
+function flowRows(product) {
+  if (product.cfm_max == null || product.cfm_max === '') return []
+  const isRange = product.cfm_min != null && product.cfm_min !== ''
+  const minM3 = product.specs?.['Min m3/min'] ?? (isRange ? round2(Number(product.cfm_min) * CFM_TO_M3) : null)
+  const maxM3 = product.specs?.['Max m3/min'] ?? round2(Number(product.cfm_max) * CFM_TO_M3)
+  if (isRange) {
+    return [
+      ['Minimum to Maximum Flow Capacity, CFM', `${product.cfm_min} to ${product.cfm_max}`],
+      minM3 != null && maxM3 != null ? ['Minimum to Maximum Flow Capacity, m³/min', `${minM3} to ${maxM3}`] : null,
+    ]
+  }
+  return [
+    ['Flow Capacity, CFM', `${product.cfm_max}`],
+    maxM3 != null ? ['Flow Capacity, m³/min', `${maxM3}`] : null,
+  ]
+}
+
 // Build the GENERAL spec rows shared by the modal, the review, and the PDF.
 export function generalSpecRows(product) {
   if (!product) return []
@@ -47,7 +71,12 @@ export function generalSpecRows(product) {
     ['Air quality', product.air_quality],
     ['Cooling', product.wc_ac],
     ['Power', product.kw ? `${product.kw} kW / ${product.hp} hp` : null],
-    ['Capacity (CFM)', product.cfm_max ? `${product.cfm_min ?? ''}${product.cfm_min ? ' – ' : ''}${product.cfm_max}` : null],
+    ...flowRows(product),
     ['Min. lead time', leadText(product.lead_time_weeks)],
-  ].filter(([, v]) => v)
+  ].filter((r) => r && r[1])
+}
+
+// Detail spec entries for display, excluding flow figures already shown by generalSpecRows.
+export function detailSpecEntries(product) {
+  return Object.entries(product?.specs || {}).filter(([k]) => !FLOW_SPEC_KEYS.has(k))
 }

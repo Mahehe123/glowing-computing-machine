@@ -25,6 +25,7 @@ export default function Catalog() {
   const [showImport, setShowImport] = useState(false)
   const [showAdd, setShowAdd] = useState(false)
   const [staleMonths, setStaleMonths] = useState(6)
+  const [minMargin, setMinMargin] = useState(15)
   const { isAdmin, profile } = useAuth()
   const toast = useToast()
   const company = profile?.company_name || 'Our brand'
@@ -32,10 +33,11 @@ export default function Catalog() {
   async function load() {
     const [{ data }, { data: s }] = await Promise.all([
       supabase.from('products').select('*').order('series').order('model'),
-      supabase.from('app_settings').select('cost_stale_months').eq('id', 1).single(),
+      supabase.from('app_settings').select('cost_stale_months, min_margin_pct').eq('id', 1).single(),
     ])
     setRows(data || [])
     setStaleMonths(s?.cost_stale_months ?? 6)
+    setMinMargin(s?.min_margin_pct ?? 15)
     setEdits({})
   }
   useEffect(() => { load() }, [])
@@ -68,6 +70,17 @@ export default function Catalog() {
     if (error) return toast(error.message, 'error')
     toast('Saved.', 'success')
     setRows((rs) => rs.map((x) => (x.id === r.id ? { ...x, ...patch } : x)))
+    setEdits((s) => { const c = { ...s }; delete c[r.id]; return c })
+  }
+
+  async function remove(r) {
+    if (!confirm(`Delete "${r.model}"? This permanently removes it from the catalog and cannot be undone.`)) return
+    setSaving(r.id)
+    const { error } = await supabase.from('products').delete().eq('id', r.id)
+    setSaving(null)
+    if (error) return toast(error.message, 'error')
+    toast('Product deleted.', 'success')
+    setRows((rs) => rs.filter((x) => x.id !== r.id))
     setEdits((s) => { const c = { ...s }; delete c[r.id]; return c })
   }
 
@@ -154,7 +167,7 @@ export default function Catalog() {
                       </div>
                     )}
                   </td>
-                  <td className={`p-3 text-right font-medium ${m === null ? 'text-slate-300' : m < 15 ? 'text-red-600' : 'text-green-700'}`}>
+                  <td className={`p-3 text-right font-medium ${m === null ? 'text-slate-300' : m < minMargin ? 'text-red-600' : 'text-green-700'}`}>
                     {m === null ? '—' : pct(m)}
                   </td>
                   <td className="p-3 text-right">
@@ -167,6 +180,10 @@ export default function Catalog() {
                       disabled={!dirty || saving === r.id} onClick={() => save(r)}>
                       {saving === r.id ? '…' : 'Save'}
                     </button>
+                    {isAdmin && (
+                      <button className="py-1 px-2 text-xs text-red-600 hover:text-red-800 disabled:opacity-40 ml-1"
+                        disabled={saving === r.id} onClick={() => remove(r)}>Delete</button>
+                    )}
                   </td>
                 </tr>
               )

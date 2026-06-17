@@ -1,7 +1,7 @@
 import { RM, fmtDate } from './format'
 import { lineNet, sellingUnit, anchorUnit, discountPct, quoteTotals } from './pricing'
 import { categoryOf } from './categories'
-import { generalSpecRows, clausesFor, longestLead, leadText, itemLabel } from './quoteDoc'
+import { generalSpecRows, detailSpecEntries, clausesFor, longestLead, leadText, itemLabel } from './quoteDoc'
 
 const BRAND = [15, 76, 129]
 
@@ -153,7 +153,7 @@ export async function generateQuotePDF({ quote, items, customer, profile }) {
       doc.setDrawColor(...BRAND).setLineWidth(1.5).line(M, 88, W - M, 88)
       doc.setTextColor(30)
 
-      const specRows = [...generalSpecRows(it.product), ...Object.entries(it.product.specs || {})]
+      const specRows = [...generalSpecRows(it.product), ...detailSpecEntries(it.product)]
         .map(([k, v]) => [k, String(v)])
 
       autoTable(doc, {

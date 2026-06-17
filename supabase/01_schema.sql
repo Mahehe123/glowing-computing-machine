@@ -136,6 +136,7 @@ create table if not exists public.competitors (
 create table if not exists public.app_settings (
   id               int primary key default 1,
   cost_stale_months int not null default 6,
+  min_margin_pct   numeric not null default 15,
   updated_at       timestamptz default now(),
   constraint app_settings_singleton check (id = 1)
 );

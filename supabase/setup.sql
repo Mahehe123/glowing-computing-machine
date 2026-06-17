@@ -146,6 +146,7 @@ create table if not exists public.competitors (
 create table if not exists public.app_settings (
   id               int primary key default 1,
   cost_stale_months int not null default 6,
+  min_margin_pct   numeric not null default 15,
   updated_at       timestamptz default now(),
   constraint app_settings_singleton check (id = 1)
 );
@@ -253,9 +254,16 @@ create policy "profiles read"   on public.profiles for select to authenticated u
 create policy "profiles insert" on public.profiles for insert to authenticated with check (id = auth.uid());
 create policy "profiles update" on public.profiles for update to authenticated using (id = auth.uid() or public.is_admin()) with check (id = auth.uid() or public.is_admin());
 
--- products: active users only.
-drop policy if exists "products all" on public.products;
-create policy "products all" on public.products for all to authenticated using (public.is_active()) with check (public.is_active());
+-- products: active users read/insert/update; only admins may delete.
+drop policy if exists "products all"    on public.products;
+drop policy if exists "products read"   on public.products;
+drop policy if exists "products insert" on public.products;
+drop policy if exists "products update" on public.products;
+drop policy if exists "products delete" on public.products;
+create policy "products read"   on public.products for select to authenticated using (public.is_active());
+create policy "products insert" on public.products for insert to authenticated with check (public.is_active());
+create policy "products update" on public.products for update to authenticated using (public.is_active()) with check (public.is_active());
+create policy "products delete" on public.products for delete to authenticated using (public.is_admin());
 
 -- customers: active users only.
 drop policy if exists "customers all" on public.customers;
@@ -372,10 +380,13 @@ alter table public.quotation_items add column if not exists markup_pct numeric d
 create table if not exists public.app_settings (
   id               int primary key default 1,
   cost_stale_months int not null default 6,
+  min_margin_pct   numeric not null default 15,
   updated_at       timestamptz default now(),
   constraint app_settings_singleton check (id = 1)
 );
 insert into public.app_settings (id) values (1) on conflict (id) do nothing;
+-- Minimum acceptable margin %; quotes/catalog flag anything below this in red.
+alter table public.app_settings add column if not exists min_margin_pct numeric not null default 15;
 
 alter table public.app_settings enable row level security;
 drop policy if exists "settings read"   on public.app_settings;

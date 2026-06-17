@@ -18,6 +18,8 @@ create table if not exists public.app_settings (
   constraint app_settings_singleton check (id = 1)
 );
 insert into public.app_settings (id) values (1) on conflict (id) do nothing;
+-- Minimum acceptable margin %; quotes/catalog flag anything below this in red.
+alter table public.app_settings add column if not exists min_margin_pct numeric not null default 15;
 
 alter table public.app_settings enable row level security;
 drop policy if exists "settings read"   on public.app_settings;

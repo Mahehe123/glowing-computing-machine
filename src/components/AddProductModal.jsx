@@ -5,6 +5,9 @@ import { useToast } from '../context/ToastContext'
 
 const STARTERS = ['Star delta', 'Inverter', 'DOL']
 const COOLING = ['Air Cooled', 'Water Cooled']
+const IE_RATINGS = ['IE2', 'IE3', 'IE4', 'IE5+']
+const POWER_SUPPLIES = ['400v/3ph/50hz', '380v/3ph/50hz', '415v/3ph/50hz']
+const MOTOR_TYPES = ['TEFC, Class F', 'TEFC, Class E']
 const EQUIPMENT = Object.keys(EQUIPMENT_TYPES)
 const TECH_BY_TYPE = { 'Oil Lubricated': ['Oil lubricated'], 'Oil-Free': ['Water lubricated', 'Dry Screw'] }
 const CFM_TO_M3 = 0.0283168
@@ -31,8 +34,9 @@ export default function AddProductModal({ defaultBrand, onClose, onDone }) {
   const powered = isComp || isDryer
   const showMinCfm = isComp && f.starter === 'Inverter'
   const showWater = (powered) && f.cooling === 'Water Cooled'
-  const hp = f.kw ? (Number(f.kw) * 1.341).toFixed(1) : ''
+  const hp = f.kw ? Math.ceil(Number(f.kw) * 1.341) : ''
   const flowM3 = f.cfm_max ? (Number(f.cfm_max) * CFM_TO_M3).toFixed(2) : ''
+  const minFlowM3 = f.cfm_min ? (Number(f.cfm_min) * CFM_TO_M3).toFixed(2) : ''
   const filterM3 = f.filter_cfm ? (Number(f.filter_cfm) * CFM_TO_M3).toFixed(2) : ''
   const techOptions = TECH_BY_TYPE[f.type] || []
 
@@ -55,6 +59,7 @@ export default function AddProductModal({ defaultBrand, onClose, onDone }) {
     }
     if (isDryer) put('Max working pressure', num(f.max_working_pressure))
     if (isComp || isDryer) put('Max m3/min', flowM3 ? Number(flowM3) : null)
+    if (showMinCfm) put('Min m3/min', minFlowM3 ? Number(minFlowM3) : null)
     if (isFilter) {
       put('filter, cfm', num(f.filter_cfm)); put('Filter, m3/min', filterM3 ? Number(filterM3) : null)
       put('Particle removal', num(f.particle_removal)); put('filter oil carry over', num(f.oil_carryover))
@@ -94,6 +99,8 @@ export default function AddProductModal({ defaultBrand, onClose, onDone }) {
           <Fld label="Brand" value={f.brand} onChange={set('brand')} placeholder={defaultBrand} />
           <Fld label="Model *" value={f.model} onChange={set('model')} />
           <Fld label="Part No." value={f.tpl} onChange={set('tpl')} />
+          <Fld label="Cost RM" type="number" value={f.cost_rm} onChange={set('cost_rm')} />
+          <Fld label="Lead (weeks)" type="number" value={f.lead_time_weeks} onChange={set('lead_time_weeks')} />
           <Sel label="Equipment *" value={eq} onChange={(e) => setF((s) => ({ ...s, equipment: e.target.value, type: '', technology: '' }))} options={EQUIPMENT} />
           <Sel label="Type" value={f.type} onChange={(e) => setF((s) => ({ ...s, type: e.target.value, technology: '' }))} options={eq ? EQUIPMENT_TYPES[eq] : []} disabled={!eq} />
           {isComp && <Sel label="Technology" value={f.technology} onChange={set('technology')} options={techOptions} disabled={!f.type} />}
@@ -106,7 +113,7 @@ export default function AddProductModal({ defaultBrand, onClose, onDone }) {
             <Fld label="kW *" type="number" value={f.kw} onChange={set('kw')} />
             <Fld label="hp (auto)" value={hp} readOnly />
             {isComp && <Fld label="Real / input kW" type="number" value={f.real_kw} onChange={set('real_kw')} />}
-            <Fld label="Power Supply" value={f.power_supply} onChange={set('power_supply')} placeholder="400v/3ph/50hz" />
+            <Sel label="Power Supply" value={f.power_supply} onChange={set('power_supply')} options={POWER_SUPPLIES} />
             {showWater && <Fld label="Cooling water flow" type="number" value={f.water_flow} onChange={set('water_flow')} />}
             {showWater && <Fld label="Cooling water pressure" type="number" value={f.water_pressure} onChange={set('water_pressure')} />}
           </Section>
@@ -114,9 +121,10 @@ export default function AddProductModal({ defaultBrand, onClose, onDone }) {
 
         {(powered || isFilter) && (
           <Section title="Flow & pressure">
-            {showMinCfm && <Fld label="Min CFM" type="number" value={f.cfm_min} onChange={set('cfm_min')} />}
-            {powered && <Fld label="Flow Capacity, CFM" type="number" value={f.cfm_max} onChange={set('cfm_max')} />}
-            {powered && <Fld label="Flow Capacity, m³/min (auto)" value={flowM3} readOnly />}
+            {showMinCfm && <Fld label="Minimum Flow Capacity, CFM" type="number" value={f.cfm_min} onChange={set('cfm_min')} />}
+            {powered && <Fld label={showMinCfm ? 'Maximum Flow Capacity, CFM' : 'Flow Capacity, CFM'} type="number" value={f.cfm_max} onChange={set('cfm_max')} />}
+            {showMinCfm && <Fld label="Minimum Flow Capacity, m³/min (auto)" value={minFlowM3} readOnly />}
+            {powered && <Fld label={showMinCfm ? 'Maximum Flow Capacity, m³/min (auto)' : 'Flow Capacity, m³/min (auto)'} value={flowM3} readOnly />}
             {isFilter && <Fld label="Filter flow rate, CFM" type="number" value={f.filter_cfm} onChange={set('filter_cfm')} />}
             {isFilter && <Fld label="Filter flow rate, m³/min (auto)" value={filterM3} readOnly />}
             {isComp && <Fld label="Loading Pressure, bar" type="number" value={f.loading_pressure} onChange={set('loading_pressure')} />}
@@ -127,9 +135,8 @@ export default function AddProductModal({ defaultBrand, onClose, onDone }) {
 
         {isComp && (
           <Section title="Motor & output">
-            <Fld label="IE Rating" value={f.ie_rating} onChange={set('ie_rating')} />
-            <Fld label="Motor Type" value={f.motor_type} onChange={set('motor_type')} />
-            <Fld label="Outlet air temperature, °C" type="number" value={f.outlet_air_temp} onChange={set('outlet_air_temp')} />
+            <Sel label="IE Rating" value={f.ie_rating} onChange={set('ie_rating')} options={IE_RATINGS} />
+            <Sel label="Motor Type" value={f.motor_type} onChange={set('motor_type')} options={MOTOR_TYPES} />
           </Section>
         )}
 
@@ -148,13 +155,12 @@ export default function AddProductModal({ defaultBrand, onClose, onDone }) {
           </Section>
         )}
 
-        <Section title="Physical & commercial">
+        <Section title="Physical">
           {(isComp || isDryer) && <Fld label="Noise level, dB" type="number" value={f.noise} onChange={set('noise')} />}
-          <Fld label="Outlet" value={f.outlet} onChange={set('outlet')} />
-          <Fld label="Weight" type="number" value={f.weight} onChange={set('weight')} />
+          {isComp && <Fld label="Outlet air temperature, °C" type="number" value={f.outlet_air_temp} onChange={set('outlet_air_temp')} />}
+          <Fld label="Air Outlet, inch" value={f.outlet} onChange={set('outlet')} />
+          <Fld label="Weight, KG" type="number" value={f.weight} onChange={set('weight')} />
           <Fld label="Dimension (L x W x H mm)" value={f.dimension} onChange={set('dimension')} />
-          <Fld label="Cost RM" type="number" value={f.cost_rm} onChange={set('cost_rm')} />
-          <Fld label="Lead (weeks)" type="number" value={f.lead_time_weeks} onChange={set('lead_time_weeks')} />
         </Section>
 
         <p className="text-xs text-slate-400 mt-3">Selling price is derived from cost + smart markup at quote time.</p>

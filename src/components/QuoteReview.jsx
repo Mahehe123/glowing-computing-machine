@@ -1,7 +1,7 @@
 import { RM, fmtDate } from '../lib/format'
 import { lineNet, sellingUnit, anchorUnit, discountPct, quoteTotals } from '../lib/pricing'
 import { categoryOf } from '../lib/categories'
-import { generalSpecRows, clausesFor, longestLead, leadText, itemLabel } from '../lib/quoteDoc'
+import { generalSpecRows, detailSpecEntries, clausesFor, longestLead, leadText, itemLabel } from '../lib/quoteDoc'
 
 // On-screen review of the quotation, laid out like the PDF (page 1 + spec pages).
 export default function QuoteReview({ quote, items, customer, profile, onClose, onDownload }) {
@@ -131,7 +131,7 @@ export default function QuoteReview({ quote, items, customer, profile, onClose, 
             </div>
             <table className="w-full text-sm">
               <tbody>
-                {[...generalSpecRows(it.product), ...Object.entries(it.product.specs || {})].map(([k, v], idx) => (
+                {[...generalSpecRows(it.product), ...detailSpecEntries(it.product)].map(([k, v], idx) => (
                   <tr key={idx} className="border-b">
                     <td className="py-1.5 text-slate-500 w-1/2">{k}</td>
                     <td className="py-1.5 font-medium">{String(v)}</td>

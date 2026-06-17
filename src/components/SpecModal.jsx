@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { RM } from '../lib/format'
 import { categoryOf } from '../lib/categories'
-import { generalSpecRows } from '../lib/quoteDoc'
+import { generalSpecRows, detailSpecEntries } from '../lib/quoteDoc'
 import { supabase } from '../lib/supabase'
 import { useToast } from '../context/ToastContext'
 
@@ -46,7 +46,7 @@ export default function SpecModal({ product, onClose, editable = false, onSaved 
   }
 
   const coreRows = generalSpecRows(product)
-  const specEntries = Object.entries(product.specs || {})
+  const specEntries = detailSpecEntries(product)
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={tryClose}>

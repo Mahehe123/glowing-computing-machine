@@ -32,6 +32,7 @@ export default function QuotationEditor() {
 
   const [products, setProducts] = useState([])
   const [customers, setCustomers] = useState([])
+  const [minMargin, setMinMargin] = useState(15)
   const [items, setItems] = useState([])
   const [busy, setBusy] = useState(false)
 
@@ -56,6 +57,8 @@ export default function QuotationEditor() {
   useEffect(() => {
     supabase.from('products').select('*').order('series').then(({ data }) => setProducts(data || []))
     supabase.from('customers').select('*').order('company').then(({ data }) => setCustomers(data || []))
+    supabase.from('app_settings').select('min_margin_pct').eq('id', 1).single()
+      .then(({ data }) => { if (data?.min_margin_pct != null) setMinMargin(data.min_margin_pct) })
   }, [])
 
   useEffect(() => {
@@ -321,7 +324,7 @@ export default function QuotationEditor() {
           </div>
           <div className="flex justify-between text-xs">
             <span className="text-slate-500">Margin (internal)</span>
-            <span className={marginPct === null ? 'text-slate-400' : marginPct < 15 ? 'text-red-600 font-medium' : 'text-green-700 font-medium'}>
+            <span className={marginPct === null ? 'text-slate-400' : marginPct < minMargin ? 'text-red-600 font-medium' : 'text-green-700 font-medium'}>
               {marginPct === null ? '—' : `${marginPct.toFixed(1)}%`}
             </span>
           </div>

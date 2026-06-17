@@ -50,9 +50,16 @@ create policy "profiles read"   on public.profiles for select to authenticated u
 create policy "profiles insert" on public.profiles for insert to authenticated with check (id = auth.uid());
 create policy "profiles update" on public.profiles for update to authenticated using (id = auth.uid() or public.is_admin()) with check (id = auth.uid() or public.is_admin());
 
--- products: active users only.
-drop policy if exists "products all" on public.products;
-create policy "products all" on public.products for all to authenticated using (public.is_active()) with check (public.is_active());
+-- products: active users read/insert/update; only admins may delete.
+drop policy if exists "products all"    on public.products;
+drop policy if exists "products read"   on public.products;
+drop policy if exists "products insert" on public.products;
+drop policy if exists "products update" on public.products;
+drop policy if exists "products delete" on public.products;
+create policy "products read"   on public.products for select to authenticated using (public.is_active());
+create policy "products insert" on public.products for insert to authenticated with check (public.is_active());
+create policy "products update" on public.products for update to authenticated using (public.is_active()) with check (public.is_active());
+create policy "products delete" on public.products for delete to authenticated using (public.is_admin());
 
 -- customers: active users only.
 drop policy if exists "customers all" on public.customers;
